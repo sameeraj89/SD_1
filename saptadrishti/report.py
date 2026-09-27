@@ -69,8 +69,9 @@ def run_record_markdown(state: dict, register_events: list[dict]) -> str:
         meta = "; ".join(f"{k} “{v}”" for k, v in d["metadata"].items()) or "no document metadata"
         out.append(f"| Pack | {d['filename']} — {d['pages']} page(s), {d['media_type']}; {meta} |")
         out.append(f"| SHA-256 | `{d['sha256']}` |")
-        out.append("| Rendered verification | " + ("Text layer present; extracted and frozen."
-                   if d["text_layer"] else " ".join(d["notes"])) + " |")
+        out.append("| Rendered verification | " + (" ".join(d.get("notes", [])) or "Text layer present; extracted and frozen.") + " |")
+        for a in d.get("artifacts", [])[:40]:
+            out.append(f"| Quarantined artifact | p{a['page']} L{a['line']}: extracted “{a['extracted'][:80]}” → rendered “{a['rendered'][:80]}” |")
     out += [
         f"| As-of date | {req['as_of']} |",
         f"| Audience | {req['audience']} |",

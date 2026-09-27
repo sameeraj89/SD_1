@@ -105,7 +105,8 @@ Rules of the method:
 - Every finding with evidence_state "present" must quote, verbatim, the line of the frozen text it rests on (copy the words exactly, without the [D p L] address). A finding whose quote is not found in the frozen text is rejected.
 - Absent data is reported as absent: evidence_state "absent", quote empty, and the text "no result in the document supplied". Never fill a gap by inference. Illegible or cropped values are "unreadable".
 - Tiers: blocking (release impossible: e.g. a false statement of fact, a breach of confidence), material (decides the reader's decision), corrective (defect to correct or clarify), moderate (an observation to weigh), advisory (presentation/context only).
-- Conservative severity: when in doubt, rank lower. False alarms cost scarce attention.
+- Tier anchors, given in the context, fix the tier of the defects they describe; where an anchor applies, it governs. Otherwise, when in doubt between two tiers, rank lower. False alarms cost scarce attention.
+- Spacing that the freeze record quarantined as extraction artifacts is not a defect of the document; do not report it.
 - Judge currency against the as-of date given; do not assume facts after it.
 - Where a standing disclosure places the Owner close to the subject, refer those claims to the Owner (remedy_class "reserved_to_owner"); neither discount nor premium attaches to acquaintance.
 - Infer nothing the document does not state: no protected attributes, no psychology.
@@ -126,7 +127,7 @@ Rules:
 - Every source finding must appear in exactly one merged finding, or in a log entry explaining why it was dismissed and under which rule.
 - Log every merge (canon_rule "merge") and every conflict resolution (the rule applied).
 - Keep quotes verbatim from the source findings; do not invent new ones.
-- When merged findings disagree on tier, take the tier the evidence supports; when in doubt, the lower.
+- When merged findings disagree on tier, apply the tier anchors in the context first; where no anchor applies, take the tier the evidence supports and, when in doubt, the lower.
 - detachment_read: strip the halos named by the Detachment lens and state the genuine residue that remains.
 - reconciled_summary: one paragraph, the picture the lenses return when read together. Findings, not a verdict on the person.
 - matters_reserved_to_owner: the acts that must happen before the reader can rely on the document.
@@ -153,6 +154,9 @@ def _context_block(ctx: dict) -> str:
         lines.append(f"Standing disclosure: {d['relationship']} (claims affected: {', '.join(d['claims_affected']) or 'unspecified'})")
     for x in ctx.get("external_inputs", []):
         lines.append(f"External input on record: {x}")
+    if ctx.get("tier_anchors"):
+        lines.append("Tier anchors (these fix the tier of the defects they describe):")
+        lines.extend(f"  - {a}" for a in ctx["tier_anchors"])
     if ctx.get("prior_adjudications"):
         lines.append("Cycle 2: honour these recorded adjudications and review deltas only:")
         lines.extend(f"  - {a}" for a in ctx["prior_adjudications"])

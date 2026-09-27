@@ -30,6 +30,8 @@ class FrozenDoc:
     text_layer: bool            # False -> scanned; text comes from a transcription
     lines: list[dict] = field(default_factory=list)  # {"page": int, "line": int, "text": str}
     notes: list[str] = field(default_factory=list)
+    artifacts: list[dict] = field(default_factory=list)  # quarantined extraction artifacts
+    rendered_verified: bool = False
 
 
 def sha256_file(path: str) -> str:
@@ -63,6 +65,69 @@ def _pdf_pages(path: str) -> tuple[list[str], dict]:
     return [p.extract_text() or "" for p in r.pages], meta
 
 
+def respace_from_rendered(extracted: str, rendered: str) -> tuple[str, list[int]]:
+    """Rendered verification (Clause 4.18 in the run records).
+
+    Text extraction mis-spaces words ('stakeholder s', 's tructuring') while
+    the rendered glyph layer does not. Where both carry the same characters,
+    keep the extracted line layout but take every word break from the
+    rendered layer. Returns the repaired page and the 0-based indices of the
+    non-empty lines that changed: those are quarantined extraction artifacts.
+    """
+    ws = re.compile(r"\s")
+    r_chars = [c for c in rendered if not ws.match(c)]
+    # gap_after[k]: the rendered layer has whitespace after non-space char k
+    gap_after, k = [False] * len(r_chars), -1
+    for c in rendered:
+        if ws.match(c):
+            if k >= 0:
+                gap_after[k] = True
+        else:
+            k += 1
+    if [c for c in extracted if not ws.match(c)] != r_chars:
+        raise ValueError("extracted and rendered layers carry different characters")
+
+    out_lines, changed, k, n = [], [], -1, 0
+    for line in extracted.split("\n"):
+        if not line.strip():
+            out_lines.append(line)
+            continue
+        buf, i = [], 0
+        while i < len(line):
+            c = line[i]
+            if ws.match(c):
+                j = i
+                while j < len(line) and ws.match(line[j]):
+                    j += 1
+                if j < len(line) and k >= 0:  # interior run: keep only if rendered has a break
+                    if gap_after[k]:
+                        buf.append(line[i:j])
+                else:
+                    buf.append(line[i:j])
+                i = j
+                continue
+            if buf and k >= 0 and gap_after[k] and not ws.match(buf[-1][-1]):
+                buf.append(" ")  # run-together words: the rendered layer shows a break
+            buf.append(c)
+            k += 1
+            i += 1
+        new = "".join(buf)
+        if " ".join(new.split()) != " ".join(line.split()):
+            changed.append(n)
+        out_lines.append(new)
+        n += 1
+    return "\n".join(out_lines), changed
+
+
+def _rendered_pages(path: str) -> list[str] | None:
+    try:
+        import pymupdf
+    except ImportError:
+        return None
+    with pymupdf.open(path) as d:
+        return [p.get_text("text") for p in d]
+
+
 def _docx_pages(path: str) -> tuple[list[str], dict]:
     try:
         import docx  # python-docx
@@ -84,6 +149,36 @@ def _to_lines(pages: list[str]) -> list[dict]:
             if raw.strip():
                 n += 1
                 out.append({"page": pno, "line": n, "text": raw.rstrip()})
+    return out
+
+
+def _verify_rendered(doc: FrozenDoc, path: str, pages: list[str]) -> list[str]:
+    rendered = _rendered_pages(path)
+    if rendered is None or len(rendered) != len(pages):
+        doc.notes.append("Rendered verification unavailable; text layer frozen as extracted.")
+        return pages
+    out = []
+    for pno, (ext, ren) in enumerate(zip(pages, rendered), 1):
+        try:
+            fixed, changed = respace_from_rendered(ext, ren)
+        except ValueError:
+            doc.notes.append(f"Page {pno}: rendered and extracted layers differ in content; "
+                             "extracted text frozen, page flagged for inspection.")
+            out.append(ext)
+            continue
+        before = [l for l in ext.split("\n") if l.strip()]
+        after = [l for l in fixed.split("\n") if l.strip()]
+        for i in changed:
+            doc.artifacts.append({"page": pno, "line": i + 1,
+                                  "extracted": " ".join(before[i].split()),
+                                  "rendered": " ".join(after[i].split())})
+        out.append(fixed)
+    doc.rendered_verified = True
+    doc.notes.append(
+        f"All {len(pages)} page(s) checked against the rendered glyph layer. "
+        f"{len(doc.artifacts)} line(s) carried extraction spacing artifacts (split or run-together "
+        "words); corrected from the rendered layer and quarantined as presentation-tier. "
+        "Spacing in the frozen text is as rendered.")
     return out
 
 
@@ -120,6 +215,8 @@ def freeze_file(index: int, path: str, transcriber=None) -> FrozenDoc:
             f"Pages {empty} carried no text layer; read as rendered images and the "
             "verbatim transcription frozen. Illegible or cropped values are marked [?]."
         )
+    elif media == "application/pdf":
+        pages = _verify_rendered(doc, path, pages)
     doc.lines = _to_lines(pages)
     if not doc.lines:
         raise FreezeError(f"{doc.filename}: no readable content")
@@ -141,11 +238,23 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
+def _meta_date(v: str) -> str:
+    """PDF dates look like D:20250810172629+00'00'; show them as 2025-08-10."""
+    m = re.match(r"D:(\d{4})(\d{2})(\d{2})", v)
+    return f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else v
+
+
 def render_for_reading(docs: list[FrozenDoc]) -> str:
     """The frozen text as every lens sees it: each line addressable by doc/page/line."""
     parts = []
     for d in docs:
         parts.append(f"=== DOCUMENT {d.index}: {d.filename} ({d.pages} pages) ===")
+        meta = {k: _meta_date(v) if k in ("creationdate", "moddate", "created", "modified") else v
+                for k, v in d.metadata.items()}
+        if meta:
+            parts.append("Freeze record, document metadata: " + "; ".join(f"{k} {v}" for k, v in meta.items()))
+        for n in d.notes:
+            parts.append(f"Freeze record: {n}")
         for ln in d.lines:
             parts.append(f"[D{d.index} p{ln['page']} L{ln['line']}] {ln['text']}")
     return "\n".join(parts)

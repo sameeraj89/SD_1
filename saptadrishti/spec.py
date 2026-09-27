@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-SPEC_VERSION = "2.4-proto"
+SPEC_VERSION = "2.5-proto"
 MAX_CYCLES = 2  # I4: at most two corrective cycles per version
 
 # ---------------------------------------------------------------- lenses ---
@@ -121,12 +121,23 @@ PROFILES: dict[str, dict] = {
             "prudence": "Risk and diligence signals: tenures, gaps, associations, and claims that would matter in a governance-sensitive appointment.",
             "veracity": "Internal consistency and verifiability: dates, arithmetic, undated roles, unverifiable superlatives, tense drift, currency of the document against the as-of date.",
             "architecture": "The document as a construction: structure and finish, and what its craft says relative to its claims.",
-            "positioning": "The career as strategy: trajectory, transitions, timing, and what the profile is built toward. If a requisition is given, read against it.",
+            "positioning": "The career as strategy: trajectory, transitions, timing, and what the profile is built toward. If a requisition is given, read against it. Read the tenure pattern (how long each role lasted, and whether it stabilises) and the staff-versus-line character of the roles against the self-description. Read timing: when the document was authored (freeze-record metadata) relative to the start of the current role, and what that implies about present motivation; frame it as a probe, never as an inference about the person.",
             "purpose": "Fitness of the instrument for its audience and mandate: what it evidences, and what it omits.",
             "detachment": "Bias control on the reading itself: halo and taint by association resisted with equal force. Apply the familiarity-bias guard for any standing disclosure.",
             "stewardship": "Handling of the person behind the paper: identifiers, protected data (photo, DOB, sex, family), retention, purge, dignity. Also buried strengths the reader should not miss.",
         },
         "probes": True,
+        "tier_anchors": [
+            "material: a current or 'Present' role, or the document as a whole, more than 12 months past the document's authored date at the as-of date, so the record cannot show the candidate's present position",
+            "material: a cluster of outcome claims inside a standing disclosure, which must be adjudicated first-hand by the Owner before anyone relies on it",
+            "material: a tenure, association or event that would decide a governance-sensitive appointment (for example, a firm later charged with fraud)",
+            "corrective: a true fact imported beyond its scope, such as a later corporate outcome presented inside an earlier role, or an aggregate that conflates funds stewarded with capital raised",
+            "corrective: a scale claim extraordinary for the stated title or tenure, needing referee verification",
+            "corrective: a senior role missing a start or end date, or tense drift that leaves a role's status unclear",
+            "corrective: genuine surface defects in the rendered text; never spacing already quarantined as extraction artifacts at freeze",
+            "moderate: an unexplained gap; a tenure-pattern or positioning observation; round, unverifiable programme figures; a timing signal on present motivation",
+            "advisory: presentation or context only",
+        ],
     },
     "clinical": {
         "edition": "core",
@@ -224,6 +235,16 @@ FORBIDDEN_PROVENANCE_PATTERNS = [
 ]
 
 
+GENERAL_TIER_ANCHORS = [
+    "blocking: a false statement of fact, or a breach of confidence, in text about to be released",
+    "material: an omission or contradiction that would change the reader's decision",
+]
+
+
+def tier_anchors(profile: str) -> list[str]:
+    return GENERAL_TIER_ANCHORS + PROFILES[profile].get("tier_anchors", [])
+
+
 def charter_for(lens: str, profile: str) -> str:
     base = LENSES[lens]["charter"]
     tuned = PROFILES[profile]["tuning"].get(lens)
@@ -238,6 +259,7 @@ def method_payload() -> dict:
         "profiles": PROFILES,
         "tiers": TIERS,
         "canon": CANON,
+        "general_tier_anchors": GENERAL_TIER_ANCHORS,
         "remedy_classes": REMEDY_CLASSES,
         "evidence_states": EVIDENCE_STATES,
     }

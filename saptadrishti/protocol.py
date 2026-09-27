@@ -149,6 +149,7 @@ class Run:
             "external_inputs": req["external_inputs"],
             "prior_adjudications": self.state.get("prior_adjudications", []),
             "needs_signatory": req["profile"] in ("general", "clinical", "legal"),
+            "tier_anchors": spec.tier_anchors(req["profile"]),
         }
 
     # ============================================================ Phase 0

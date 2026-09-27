@@ -337,3 +337,37 @@ def test_replay_engine_writes_prompts_then_consumes_outputs(tmp_path, pack):
         r.reconcile()
     assert r.state["status"] == "audited"  # nothing advanced without the output
     assert "chat-emulated" in r.state["model_identity"]
+
+
+# ------------------------------------------------ rendered verification ---
+
+def test_respace_splits_and_joins_from_rendered_layer():
+    from saptadrishti.freeze import respace_from_rendered
+    extracted = "managing complex stakeholder s, and\n• Part of a 3 -member team, s tructuring\nInstitute (Govt.of UP)"
+    rendered = "managing complex stakeholders, and • Part of a 3-member team, structuring Institute (Govt.of UP)"
+    fixed, changed = respace_from_rendered(extracted, rendered)
+    assert fixed.split("\n") == ["managing complex stakeholders, and",
+                                 "• Part of a 3-member team, structuring",
+                                 "Institute (Govt.of UP)"]  # a genuine defect survives
+    assert changed == [0, 1]
+
+
+def test_respace_restores_run_together_words_and_keeps_columns():
+    from saptadrishti.freeze import respace_from_rendered
+    fixed, changed = respace_from_rendered("2006-2010 Illinois        Bachelor\nEvidenceAction",
+                                           "2006-2010\nIllinois\nBachelor\nEvidence Action")
+    assert fixed == "2006-2010 Illinois        Bachelor\nEvidence Action" and changed == [1]
+
+
+def test_respace_refuses_different_content():
+    from saptadrishti.freeze import respace_from_rendered
+    with pytest.raises(ValueError):
+        respace_from_rendered("abc", "abd")
+
+
+def test_tier_anchors_reach_every_lens(tmp_path, pack):
+    eng = OfflineEngine()
+    r = Run(str(tmp_path / "wd"), engine=eng)
+    r.open_and_freeze(req(pack("candidate_cv.txt"), profile="cv"))
+    r.audit()
+    assert all(any("12 months" in a for a in c["ctx"]["tier_anchors"]) for c in eng.calls)
