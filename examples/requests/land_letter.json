@@ -1,0 +1,12 @@
+{
+  "pack": ["../packs/land_letter.txt"],
+  "profile": "general",
+  "subject": "Letter to a state health department seeking land for a free cancer day-care centre",
+  "owner": {"name": "Programme Director", "role": "Owner"},
+  "releaser": {"name": "Chief Executive", "role": "Releaser"},
+  "audience": "The Principal Secretary, Department of Health",
+  "purpose": "Secure the Department's consideration of a land allotment",
+  "as_of": "2026-09-27",
+  "contains_personal_data": false,
+  "engine": "claude"
+}

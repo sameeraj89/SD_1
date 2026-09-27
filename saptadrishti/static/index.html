@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SaptaDrishti Review Gate</title>
+<style>
+:root{--bg:#fbfbfa;--panel:#fff;--ink:#16181d;--muted:#667085;--line:#e4e4e1;--accent:#1f3a8a;--accent-ink:#fff;
+--blocking:#b42318;--material:#c4320a;--corrective:#b54708;--moderate:#475467;--advisory:#98a2b3;--ok:#067647}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111317;--panel:#181b21;--ink:#eceef2;--muted:#98a2b3;--line:#2a2e36;--accent:#8ea6ff;--accent-ink:#0b1020;--advisory:#667085}}
+:root[data-theme="dark"]{--bg:#111317;--panel:#181b21;--ink:#eceef2;--muted:#98a2b3;--line:#2a2e36;--accent:#8ea6ff;--accent-ink:#0b1020;--advisory:#667085}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+header{padding:20px 16px 8px;max-width:1000px;margin:auto}h1{font-size:22px;margin:0}header p{margin:4px 0 0;color:var(--muted)}
+main{max-width:1000px;margin:auto;padding:8px 16px 48px;display:grid;gap:16px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+h2{font-size:16px;margin:0 0 12px}label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+textarea{min-height:64px}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 16px}
+button{font:inherit;padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}button:disabled{opacity:.45;cursor:not-allowed}
+.verbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.muted{color:var(--muted);font-size:13px}
+.lenses{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.lens{padding:3px 10px;border-radius:99px;border:1px solid var(--line);font-size:13px;color:var(--muted)}
+.lens.done{color:var(--ink);border-color:var(--ok)}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:8px 6px;border-top:1px solid var(--line);vertical-align:top}
+.tier{font-weight:600;text-transform:capitalize}.t-blocking{color:var(--blocking)}.t-material{color:var(--material)}.t-corrective{color:var(--corrective)}.t-moderate{color:var(--moderate)}.t-advisory{color:var(--advisory)}
+.quote{font-family:Georgia,serif;color:var(--muted)}.wrap{overflow-x:auto}.err{color:var(--blocking);white-space:pre-wrap}
+.status{display:inline-block;padding:2px 8px;border-radius:4px;border:1px solid var(--line);font-size:12px}
+pre{white-space:pre-wrap;font-size:12px;background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--line);max-height:420px;overflow:auto}
+details summary{cursor:pointer;color:var(--muted);font-size:13px}
+@media (max-width:640px){td:nth-child(5),th:nth-child(5){display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>SaptaDrishti review gate</h1>
+  <p>Seven ways of seeing. Every finding tied to a line on the page; every decision left to a person.</p>
+  <p class="muted" id="meta"></p>
+</header>
+<main>
+<section id="start">
+  <h2>1 · Freeze a pack</h2>
+  <label>Documents (PDF, DOCX, TXT)</label><input type="file" id="files" multiple>
+  <div class="row">
+    <div><label>Profile</label><select id="profile"></select></div>
+    <div><label>Engine</label><select id="engine"><option value="claude">Claude (needs API key)</option><option value="offline">Offline heuristics (mechanics only)</option></select></div>
+    <div><label>As-of date</label><input type="date" id="as_of"></div>
+  </div>
+  <div class="row">
+    <div><label>Owner (accepts findings)</label><input id="owner" placeholder="Name"></div>
+    <div><label>Releaser (signs release)</label><input id="releaser" placeholder="A different person"></div>
+  </div>
+  <label>Subject</label><input id="subject" placeholder="e.g. Curriculum vitae of the candidate (pack of 10 August 2025)">
+  <label>Audience: who will rely on the page</label><input id="audience">
+  <div class="row">
+    <div><label>Purpose / mandate</label><textarea id="purpose"></textarea></div>
+    <div><label>Requisition (optional; for CVs, the role)</label><textarea id="requisition"></textarea></div>
+  </div>
+  <label>Standing disclosure (optional): the Owner's relationship to the subject</label>
+  <input id="disclosure" placeholder="e.g. The Owner supervised the candidate at X, 2022-2024">
+  <div class="row">
+    <div><label><input type="checkbox" id="pd" checked style="width:auto"> Contains personal data</label></div>
+    <div><label>Cycle-2 of run (optional)</label><input id="prior" placeholder="e.g. 2026-0927-A"></div>
+  </div>
+  <div class="verbs"><button class="primary" id="bStart">Start</button><span class="err" id="startErr"></span></div>
+</section>
+
+<section id="runbox" hidden>
+  <h2>2 · Run <span id="rid"></span> <span class="status" id="rstatus"></span></h2>
+  <div class="lenses" id="lensbar"></div>
+  <div class="verbs">
+    <button id="bPause">Pause</button><button id="bResume">Resume</button><button id="bStop">Stop</button>
+    <a id="recLink" target="_blank"><button>Run record</button></a><button id="bPurge">Purge</button>
+  </div>
+  <p class="err" id="runErr"></p>
+  <p class="muted" id="verdict"></p>
+  <div class="wrap"><table id="ftable"></table></div>
+  <div id="ownerBox" hidden>
+    <label>Owner name, to record the decision</label><input id="ownerSig">
+    <div class="verbs"><button class="primary" id="bAccept">Accept</button></div>
+  </div>
+  <div id="signBox" hidden>
+    <label>Releaser name, to sign</label><input id="relSig">
+    <div class="verbs"><button class="primary" id="bSign">Sign</button><button id="bRewrite">Propose integrated rewrite</button></div>
+  </div>
+  <pre id="rewrite" hidden></pre>
+  <details><summary>Register extract</summary><pre id="reg"></pre></details>
+</section>
+
+<section>
+  <h2>Runs in this workdir</h2>
+  <div class="wrap"><table id="runs"></table></div>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);let META=null,RID=null,timer=null;
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+async function api(path,body){const r=await fetch(path,body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{});
+  const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);return j;}
+async function init(){META=await api("/api/meta");
+  $("meta").textContent=`Specification v${META.spec_version} · method ${META.method_hash.slice(0,12)}`+(META.api_key_present?"":" · no API key found: use the offline engine or set ANTHROPIC_API_KEY");
+  if(!META.api_key_present)$("engine").value="offline";
+  for(const[k,v]of Object.entries(META.profiles))$("profile").insertAdjacentHTML("beforeend",`<option value="${k}">${esc(v.label)}</option>`);
+  $("profile").onchange=()=>$("audience").placeholder=META.profiles[$("profile").value].default_audience;$("profile").onchange();
+  $("as_of").value=new Date().toISOString().slice(0,10);
+  $("lensbar").innerHTML=Object.entries(META.lenses).map(([k,v])=>`<span class="lens" id="L-${k}" title="${esc(v.question)}">${v.name}</span>`).join("");
+  listRuns();}
+const b64=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result.split(",")[1]);r.onerror=no;r.readAsDataURL(f);});
+$("bStart").onclick=async()=>{$("startErr").textContent="";try{
+  const files=[];for(const f of $("files").files)files.push({name:f.name,data:await b64(f)});
+  const body={files,profile:$("profile").value,engine:$("engine").value,as_of:$("as_of").value,
+    owner:{name:$("owner").value},subject:$("subject").value,audience:$("audience").value,purpose:$("purpose").value,
+    requisition:$("requisition").value,contains_personal_data:$("pd").checked};
+  if($("releaser").value)body.releaser={name:$("releaser").value};
+  if($("disclosure").value)body.standing_disclosures=[{relationship:$("disclosure").value,claims_affected:[]}];
+  if($("prior").value){body.cycle=2;body.prior_run_id=$("prior").value;}
+  $("bStart").disabled=true;const r=await api("/api/runs",body);openRun(r.run_id);}catch(e){$("startErr").textContent=e.message}finally{$("bStart").disabled=false}};
+function openRun(id){RID=id;$("runbox").hidden=false;$("rid").textContent=id;$("recLink").href=`/api/runs/${id}/record.html`;$("rewrite").hidden=true;poll();}
+async function poll(){clearTimeout(timer);try{const s=await api(`/api/runs/${RID}`);render(s);
+  if(["opened","frozen","auditing"].includes(s.status)&&!s.error)timer=setTimeout(poll,1500);}catch(e){$("runErr").textContent=e.message}listRuns();}
+function render(s){$("rstatus").textContent=s.status;$("runErr").textContent=s.error||s.abort_reason||"";
+  for(const k of Object.keys(META.lenses))$("L-"+k).classList.toggle("done",(s.lenses_done||[]).includes(k));
+  const live=["auditing","paused","frozen"].includes(s.status);$("bPause").disabled=$("bStop").disabled=!live;$("bResume").disabled=s.status!=="paused";
+  const f=s.findings||[];$("verdict").textContent=s.verdict?`Verdict: ${s.verdict}. ${s.reconciled_summary||""}`:"";
+  const deciding=s.status==="awaiting_owner";
+  $("ftable").innerHTML=f.length?`<tr><th>No.</th><th>Tier</th><th>Lens</th><th>Finding</th><th>Line</th><th>Decision</th></tr>`+f.map(x=>{
+    const d=(s.decisions||{})[x.id];const lens=x.lenses.map(l=>META.lenses[l].name).join(" · ");
+    const opts=["accept","adjudicate","residual_risk","reject"].filter(o=>x.tier!=="blocking"||["accept","adjudicate"].includes(o));
+    const cell=deciding?`<select data-id="${x.id}">${opts.map(o=>`<option>${o}</option>`).join("")}</select><input data-note="${x.id}" placeholder="reasons">`:esc(d?d.decision+(d.note?": "+d.note:""):"");
+    return `<tr><td>${x.id}</td><td class="tier t-${x.tier}">${x.tier}</td><td>${esc(lens)}</td><td>${esc(x.finding)}${x.quote?`<div class="quote">“${esc(x.quote)}”</div>`:""}${x.probe?`<div class="muted">Probe: ${esc(x.probe)}</div>`:""}<div class="muted">${esc(x.disposition)}</div></td><td>${esc(x.location)}</td><td>${cell}</td></tr>`}).join(""):(s.status==="awaiting_owner"?"<tr><td>No findings. A clean pass.</td></tr>":"");
+  $("ownerBox").hidden=!deciding;$("signBox").hidden=!["awaiting_release","owner_decided"].includes(s.status);
+  $("bSign").disabled=s.status!=="awaiting_release";
+  if(s.status==="owner_decided")$("verdict").textContent+=` This version cannot be released as it stands: apply the remedies (Propose integrated rewrite), then freeze the revision as cycle 2 of ${s.run_id}.`;
+  if(s.status==="closed_not_releasable")$("verdict").textContent+=" Closed under the two-cycle cap; any change re-enters as a new version.";
+  $("reg").textContent=(s.register||[]).map(e=>`${e.seq} ${e.at} ${e.kind} ${JSON.stringify(e.data)}`).join("\n");}
+for(const v of["pause","resume","stop"])$("b"+v[0].toUpperCase()+v.slice(1)).onclick=async()=>{try{await api(`/api/runs/${RID}/${v}`,{});poll()}catch(e){$("runErr").textContent=e.message}};
+$("bAccept").onclick=async()=>{const decisions={};document.querySelectorAll("select[data-id]").forEach(s=>{decisions[s.dataset.id]={decision:s.value,note:document.querySelector(`[data-note="${s.dataset.id}"]`).value}});
+  try{await api(`/api/runs/${RID}/decide`,{owner:$("ownerSig").value,decisions});poll()}catch(e){$("runErr").textContent=e.message}};
+$("bSign").onclick=async()=>{try{await api(`/api/runs/${RID}/sign`,{releaser:$("relSig").value});poll()}catch(e){$("runErr").textContent=e.message}};
+$("bRewrite").onclick=async()=>{try{const r=await api(`/api/runs/${RID}/rewrite`,{});$("rewrite").hidden=false;$("rewrite").textContent=r.changes.map(c=>"- "+c).join("\n")+"\n\n"+r.revised_text}catch(e){$("runErr").textContent=e.message}};
+$("bPurge").onclick=async()=>{if(!confirm("Destroy this run's key? Content becomes unrecoverable; the register keeps the event."))return;
+  try{await api(`/api/runs/${RID}/purge`,{});$("runbox").hidden=true;listRuns()}catch(e){$("runErr").textContent=e.message}};
+async function listRuns(){const r=await api("/api/runs");$("runs").innerHTML="<tr><th>Run</th><th>Status</th><th>Profile</th><th>Verdict</th></tr>"+
+  Object.entries(r).reverse().map(([k,v])=>`<tr><td><a href="#" onclick="openRun('${k}');return false">${k}</a></td><td>${esc(v.status)}</td><td>${esc(v.profile||"")}</td><td>${esc(v.verdict||"")}</td></tr>`).join("");}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "pack": ["../packs/candidate_cv.txt"],
+  "profile": "cv",
+  "subject": "Curriculum vitae of a senior clinician (anonymised demonstration pack)",
+  "owner": {"name": "Search Partner", "role": "Owner"},
+  "releaser": {"name": "Managing Partner", "role": "Releaser"},
+  "requisition": "",
+  "as_of": "2026-09-27",
+  "standing_disclosures": [],
+  "contains_personal_data": true,
+  "purge_if_not_proceeding": true,
+  "engine": "claude"
+}
