@@ -39,6 +39,14 @@ def artefacts(state: dict, register_events: list[dict]) -> dict:
     }
 
 
+def _diff_window(a: str, b: str, pad: int = 24) -> tuple[str, str]:
+    """The stretch around the first difference, so a long line shows what changed."""
+    i = next((k for k, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+    lo = max(0, i - pad)
+    cut = lambda s: ("…" if lo else "") + s[lo:i + pad] + ("…" if len(s) > i + pad else "")
+    return cut(a), cut(b)
+
+
 def run_record_markdown(state: dict, register_events: list[dict]) -> str:
     req = state["request"]
     prof = spec.PROFILES[req["profile"]]
@@ -71,7 +79,8 @@ def run_record_markdown(state: dict, register_events: list[dict]) -> str:
         out.append(f"| SHA-256 | `{d['sha256']}` |")
         out.append("| Rendered verification | " + (" ".join(d.get("notes", [])) or "Text layer present; extracted and frozen.") + " |")
         for a in d.get("artifacts", [])[:40]:
-            out.append(f"| Quarantined artifact | p{a['page']} L{a['line']}: extracted “{a['extracted'][:80]}” → rendered “{a['rendered'][:80]}” |")
+            e, r = _diff_window(a["extracted"], a["rendered"])
+            out.append(f"| Quarantined artifact | p{a['page']} L{a['line']}: extracted “{e}” → rendered “{r}” |")
     out += [
         f"| As-of date | {req['as_of']} |",
         f"| Audience | {req['audience']} |",
