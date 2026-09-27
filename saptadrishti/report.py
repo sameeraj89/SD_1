@@ -89,7 +89,7 @@ def run_record_markdown(state: dict, register_events: list[dict]) -> str:
         f"{' Web verification permitted.' if req['allow_web_verification'] else ' No web sources used.'} |",
     ]
     for f in state.get("verified_facts", []):
-        out.append(f"| Fact checked at freeze | {f['status'].title()}: {f['claim']} — {f['finding']} "
+        out.append(f"| Fact checked at freeze · {f.get('id', '')} | {f['status'].title()}: {f['claim']} — {f['finding']} "
                    f"({'; '.join(f.get('sources', [])[:2]) or 'no source'}) |")
     out += [
         f"| Edition · Profile | {prof['label']} |",
@@ -120,6 +120,8 @@ def run_record_markdown(state: dict, register_events: list[dict]) -> str:
         out += [f"### {group}", "", "| No. | Tier | Lens | Finding | Line | Disposition | Owner |", "|---|---|---|---|---|---|---|"]
         for f in rows:
             q = f" — “{f['quote']}”" if f.get("quote") else ""
+            if f.get("fact_refs"):
+                q += f" [facts: {', '.join(f['fact_refs'])}]"
             d = decisions.get(f["id"])
             dec = f"{d['decision']}" + (f": {d['note']}" if d.get("note") else "") if d else "pending"
             out.append(f"| {f['id']} | {f['tier'].title()} | {_lens_names(f)} | {f['finding']}{q} | "

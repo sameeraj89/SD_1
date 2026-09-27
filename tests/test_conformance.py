@@ -419,3 +419,60 @@ def test_proof_candidates_reach_architecture_only(tmp_path):
 def test_restructuring_is_not_an_adverse_anchor():
     anchors = " ".join(spec.tier_anchors("cv"))
     assert "not adverse in itself" in anchors and "charges" in anchors
+
+
+# ---------------------------------------------------- evidence field ------
+
+class _FactEngine(OfflineEngine):
+    def __init__(self, lens_findings):
+        super().__init__()
+        self.lens_findings = lens_findings
+
+    def verify_facts(self, text, ctx, declared):
+        return {"facts": [{"claim": "The Joint Secretary favours the proposal publicly", "quote": "The Joint Secretary told me privately",
+                           "status": "unverified", "finding": "No public statement found.", "sources": ["https://example.org"]}]}
+
+    def read_lens(self, lens, charter, text, ctx):
+        self.calls.append({"lens": lens, "text": text, "ctx": ctx})
+        return {"reading": "r", "findings": [dict(x) for x in self.lens_findings]}
+
+
+def _f(quote, refs):
+    return {"tier": "material", "finding": "claimed support is unverified", "quote": quote, "evidence_state": "present",
+            "remedy_class": "omit", "disposition": "", "probe": "", "fact_refs": refs}
+
+
+def _run_with(tmp_path, pack, findings):
+    r = Run(str(tmp_path / "wd"), engine=_FactEngine(findings))
+    r.open_and_freeze(req(pack(), allow_web_verification=True))
+    r.verify_contemporary_facts()
+    r.audit()
+    return r
+
+
+def test_fact_refs_are_validated(tmp_path, pack):
+    r = _run_with(tmp_path, pack, [_f("The Joint Secretary told me privately", ["F1", "F9"])])
+    f = r.state["lens_outputs"]["prudence"]["findings"][0]
+    assert f["fact_refs"] == ["F1"] and f["dropped_fact_refs"] == ["F9"]
+    assert r.state["verified_facts"][0]["id"] == "F1"
+    assert "[F1 · re D1 p1 L" in r.state["frozen_text"]
+
+
+def test_quoting_a_fact_line_is_repaired_not_rejected(tmp_path, pack):
+    r = _run_with(tmp_path, pack, [_f("UNVERIFIED: The Joint Secretary favours the proposal publicly", [])])
+    lo = r.state["lens_outputs"]["veracity"]
+    assert not lo["rejected"]
+    f = lo["findings"][0]
+    assert f["quote"] == "The Joint Secretary told me privately" and f["fact_refs"] == ["F1"]
+    assert f["quote_repaired_from"].startswith("UNVERIFIED")
+
+
+def test_invented_quote_still_rejected_with_fact_refs(tmp_path, pack):
+    r = _run_with(tmp_path, pack, [_f("a sentence that appears nowhere", ["F1"])])
+    assert r.state["lens_outputs"]["purpose"]["rejected"]
+
+
+def test_reconciled_findings_carry_fact_refs(tmp_path, pack):
+    r = _run_with(tmp_path, pack, [_f("The Joint Secretary told me privately", ["F1"])])
+    r.reconcile()
+    assert all(f["fact_refs"] == ["F1"] for f in r.state["findings"])

@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-SPEC_VERSION = "2.6-proto"
+SPEC_VERSION = "2.7-proto"
 MAX_CYCLES = 2  # I4: at most two corrective cycles per version
 
 # ---------------------------------------------------------------- lenses ---

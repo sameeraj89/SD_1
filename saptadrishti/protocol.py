@@ -197,14 +197,14 @@ class Run:
         self._check_invariants("fact_verification")
         out = self.engine.verify_facts(self.state["frozen_text"], self._ctx(), req["contemporary_facts"])
         facts = []
-        for f in out.get("facts", []):
+        for n, f in enumerate(out.get("facts", []), 1):
             loc = locate(self._docs(), f.get("quote", "")) if f.get("quote") else None
-            facts.append({**f, "location": loc or "-"})
+            facts.append({**f, "id": f"F{n}", "location": loc or "-"})
         lines = ["=== FREEZE RECORD: CONTEMPORARY FACTS CHECKED AT FREEZE "
                  f"({dt.date.today().isoformat()}; third-party public facts only) ==="]
         for f in facts:
             src = "; ".join(f.get("sources", [])[:3]) or "no source"
-            lines.append(f"[{f['location']}] {f['status'].upper()}: {f['claim']} - {f['finding']} (sources: {src})")
+            lines.append(f"[{f['id']} · re {f['location']}] {f['status'].upper()}: {f['claim']} - {f['finding']} (sources: {src})")
         if not facts:
             lines.append("No contemporary public facts required verification.")
         self.state["frozen_text"] += "\n" + "\n".join(lines)
@@ -273,8 +273,12 @@ class Run:
         kept, rejected = [], []
         for i, f in enumerate(out.get("findings", []), 1):
             f = {**f, "id": f"{lens}.{i}", "lens": lens}
+            f = self._check_fact_refs(f)
             if f["evidence_state"] == "present":
                 loc = locate(self._docs(), f["quote"])
+                if not loc:
+                    f = self._repair_fact_quote(f)
+                    loc = f.get("quote") and locate(self._docs(), f["quote"])
                 if not loc:
                     rejected.append({**f, "reason": "quotation not found in the frozen source"})
                     continue
@@ -286,6 +290,31 @@ class Run:
                 continue
             kept.append(f)
         return {"reading": out.get("reading", ""), "findings": kept, "rejected": rejected}
+
+    def _facts(self) -> dict:
+        return {f["id"]: f for f in self.state.get("verified_facts", [])}
+
+    def _check_fact_refs(self, f: dict) -> dict:
+        """Evidence field: fact_refs must name facts checked at freeze; unknown ids are dropped and logged."""
+        facts = self._facts()
+        refs = [r.strip().upper() for r in f.get("fact_refs") or []]
+        bad = [r for r in refs if r not in facts]
+        f = {**f, "fact_refs": [r for r in refs if r in facts]}
+        if bad:
+            f["dropped_fact_refs"] = bad
+        return f
+
+    def _repair_fact_quote(self, f: dict) -> dict:
+        """A lens that quoted a freeze-record fact line instead of the document keeps its finding:
+        the quote becomes that fact's own document line, and the fact is cited in fact_refs."""
+        q = re.sub(r"^\[?F\d+[^\]]*\]?\s*", "", " ".join(f.get("quote", "").split()).lower())
+        q = re.sub(r"^(verified|unverified|contradicted):\s*", "", q)[:30]
+        for fid, fact in self._facts().items():
+            claim = " ".join(fact["claim"].split()).lower()
+            if len(q) >= 12 and fact.get("location", "-") != "-" and q in claim:
+                return {**f, "quote": fact["quote"], "fact_refs": sorted({*f["fact_refs"], fid}),
+                        "quote_repaired_from": f["quote"]}
+        return f
 
     def pause(self) -> None:
         self._resume.clear()
@@ -323,6 +352,9 @@ class Run:
                     loc = src.get("location", "-")
             else:
                 loc = "-"
+            facts = self._facts()
+            m = {**m, "fact_refs": sorted({r for r in m.get("fact_refs", []) if r in facts}
+                                          | {r for sid in srcs for r in by_id[sid].get("fact_refs", [])})}
             counters[m["tier"]] += 1
             accounted.update(srcs)
             merged.append({**m, "id": f"{spec.TIERS[m['tier']]['prefix']}{counters[m['tier']]}",
@@ -333,8 +365,9 @@ class Run:
         for fid, f in by_id.items():
             if fid not in accounted and fid not in logged:
                 counters[f["tier"]] += 1
-                merged.append({**{k: f[k] for k in ("tier", "finding", "quote", "evidence_state",
-                                                    "remedy_class", "disposition", "probe", "location")},
+                merged.append({**{k: f.get(k, []) if k == "fact_refs" else f[k]
+                                  for k in ("tier", "finding", "quote", "evidence_state", "remedy_class",
+                                            "disposition", "probe", "location", "fact_refs")},
                                "lenses": [f["lens"]], "source_ids": [fid],
                                "id": f"{spec.TIERS[f['tier']]['prefix']}{counters[f['tier']]}"})
                 log.append({"source_ids": [fid], "conflict": "Not accounted for by reconciliation.",

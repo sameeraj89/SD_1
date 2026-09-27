@@ -27,6 +27,7 @@ _FINDING_PROPS = {
     "remedy_class": {"type": "string", "enum": spec.REMEDY_CLASSES},
     "disposition": {"type": "string"},
     "probe": {"type": "string"},
+    "fact_refs": {"type": "array", "items": {"type": "string"}},
 }
 
 LENS_SCHEMA = {
@@ -102,7 +103,8 @@ The document you are given has been frozen: it will not change during this run. 
 
 Rules of the method:
 - Findings only. You do not rewrite the document and you do not make the decision; a named person does.
-- Every finding with evidence_state "present" must quote, verbatim, the line of the frozen text it rests on (copy the words exactly, without the [D p L] address). A finding whose quote is not found in the frozen text is rejected.
+- Every finding with evidence_state "present" must quote, verbatim, the line of the document it rests on (copy the words exactly, without the [D p L] address). A finding whose quote is not found in the document is rejected. Freeze-record lines are not the document: never put them in "quote".
+- Where a finding relies on a fact checked at freeze, cite it in "fact_refs" by its id (e.g. ["F1"]); keep the document line in "quote". Otherwise leave fact_refs empty.
 - Absent data is reported as absent: evidence_state "absent", quote empty, and the text "no result in the document supplied". Never fill a gap by inference. Illegible or cropped values are "unreadable".
 - Tiers: blocking (release impossible: e.g. a false statement of fact, a breach of confidence), material (decides the reader's decision), corrective (defect to correct or clarify), moderate (an observation to weigh), advisory (presentation/context only).
 - Tier anchors, given in the context, fix the tier of the defects they describe; where an anchor applies, it governs. Otherwise, when in doubt between two tiers, rank lower. False alarms cost scarce attention.
@@ -126,7 +128,7 @@ IV  Craft serves - Architecture and Positioning adapt to Rules I-III, never the 
 Rules:
 - Every source finding must appear in exactly one merged finding, or in a log entry explaining why it was dismissed and under which rule.
 - Log every merge (canon_rule "merge") and every conflict resolution (the rule applied).
-- Keep quotes verbatim from the source findings; do not invent new ones.
+- Keep quotes verbatim from the source findings; do not invent new ones. Carry forward the union of the merged findings' fact_refs.
 - When merged findings disagree on tier, apply the tier anchors in the context first; where no anchor applies, take the tier the evidence supports and, when in doubt, the lower.
 - detachment_read: strip the halos named by the Detachment lens and state the genuine residue that remains.
 - reconciled_summary: one paragraph, the picture the lenses return when read together. Findings, not a verdict on the person.
@@ -338,7 +340,8 @@ def _lines(frozen_text: str) -> list[str]:
 
 def _f(tier, finding, quote, remedy="seek_clarification", probe="", state="present", disp=""):
     return {"tier": tier, "finding": finding, "quote": quote, "evidence_state": state,
-            "remedy_class": remedy, "disposition": disp or remedy.replace("_", " "), "probe": probe}
+            "remedy_class": remedy, "disposition": disp or remedy.replace("_", " "), "probe": probe,
+            "fact_refs": []}
 
 
 class OfflineEngine:
