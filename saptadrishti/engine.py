@@ -135,6 +135,49 @@ Rules:
 
 REWRITE_SYSTEM = """You are the integrated rewrite of the SaptaDrishti review protocol. One hand absorbs the accepted remedies into a single revision. Change only what the accepted findings require. Never introduce a fact that is not in the frozen text; where a remedy needs a fact the text lacks, insert a bracketed placeholder such as [date to be supplied]. List each change you made."""
 
+VERIFY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "facts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "claim": {"type": "string"},
+                    "quote": {"type": "string"},
+                    "status": {"type": "string", "enum": ["verified", "contradicted", "unverified"]},
+                    "finding": {"type": "string"},
+                    "sources": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["claim", "quote", "status", "finding", "sources"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["facts"],
+    "additionalProperties": False,
+}
+
+VERIFY_SYSTEM = """You are the freeze-time fact check of the SaptaDrishti review protocol.
+
+Identify the contemporary PUBLIC facts the frozen document asserts about third parties (companies, institutions, transactions, ownership, prices, dates of corporate events) and verify each against public sources on the web. Also verify any facts the requester declared.
+
+Rules:
+- Verify third-party public facts only. Never search for the document's subject by name, and never search email addresses, phone numbers or other personal identifiers. Personal claims (roles held, achievements) are not checked here; the lenses and referees handle them.
+- For each fact: "claim" states it neutrally; "quote" copies the document line it appears on, verbatim (without the [D p L] address); "status" is verified, contradicted or unverified; "finding" states what the sources show, with dates where relevant (e.g. when a transaction completed, whether a price was officially disclosed); "sources" lists the URLs relied on.
+- Report what sources say; do not judge the subject. Where sources disagree or are only press reports, say so.
+- At most 6 facts, the most consequential first."""
+
+
+def _lens_extra(lens: str, ctx: dict) -> str:
+    """Per-lens material outside the shared cached prefix."""
+    if lens == "architecture" and ctx.get("proof_candidates"):
+        rows = "\n".join(f"  - {c['at']}: {c['check']}: '{c['match']}'" for c in ctx["proof_candidates"])
+        return ("\n\n<proof_candidates>\nFlagged mechanically at freeze. Verify each against its line; "
+                "report only genuine defects, and also proofread the rest of the text yourself.\n"
+                f"{rows}\n</proof_candidates>")
+    return ""
+
 
 def _context_block(ctx: dict) -> str:
     lines = [
@@ -169,6 +212,7 @@ class Engine(Protocol):
     def read_lens(self, lens: str, charter: str, frozen_text: str, ctx: dict) -> dict: ...
     def reconcile(self, findings: list[dict], frozen_text: str, ctx: dict) -> dict: ...
     def rewrite(self, frozen_text: str, accepted: list[dict], ctx: dict) -> dict: ...
+    def verify_facts(self, frozen_text: str, ctx: dict, declared: list[str]) -> dict: ...
 
 
 # ======================================================== Claude engine ===
@@ -218,6 +262,33 @@ class ClaudeEngine:
              "cache_control": {"type": "ephemeral"}},
         ]
 
+    def verify_facts(self, frozen_text: str, ctx: dict, declared: list[str]) -> dict:
+        # Step 1: research with the server-side web search tool (continue on pause_turn).
+        content = self._doc_blocks(frozen_text, ctx) + [{"type": "text", "text":
+            "Declared facts to verify: " + ("; ".join(declared) or "none") +
+            "\n\nIdentify and verify the document's contemporary third-party public facts, then report "
+            "each with its quote, status, finding and source URLs."}]
+        messages = [{"role": "user", "content": content}]
+        for _ in range(4):
+            resp = self.client.beta.messages.create(
+                model=self.model, max_tokens=16000, system=VERIFY_SYSTEM,
+                thinking={"type": "adaptive"}, output_config={"effort": self.effort},
+                tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 8}],
+                betas=["server-side-fallback-2026-06-01"], fallbacks=[{"model": "claude-opus-4-8"}],
+                messages=messages,
+            )
+            self.served_models.add(resp.model)
+            if resp.stop_reason == "refusal":
+                raise RefusalError("model declined the fact check")
+            if resp.stop_reason != "pause_turn":
+                break
+            messages.append({"role": "assistant", "content": resp.content})
+        notes = "\n".join(b.text for b in resp.content if b.type == "text")
+        # Step 2: structure the research notes against the schema (no tools).
+        return self._call(VERIFY_SYSTEM, self._doc_blocks(frozen_text, ctx) + [
+            {"type": "text", "text": f"<research_notes>\n{notes}\n</research_notes>\n\n"
+                                     "Return the verified facts as JSON."}], VERIFY_SCHEMA)
+
     def transcribe(self, pdf_path: str, pages: int) -> list[str]:
         with open(pdf_path, "rb") as f:
             data = base64.standard_b64encode(f.read()).decode()
@@ -240,7 +311,7 @@ class ClaudeEngine:
         L = spec.LENSES[lens]
         instruction = (
             f"<lens>\n{L['name']} ({L['sanskrit']})\nThe question it asks: {L['question']}\n\n"
-            f"Charter:\n{charter}\n</lens>\n\nRead the frozen document through this lens only."
+            f"Charter:\n{charter}\n</lens>{_lens_extra(lens, ctx)}\n\nRead the frozen document through this lens only."
         )
         return self._call(PROTOCOL_SYSTEM, self._doc_blocks(frozen_text, ctx) +
                           [{"type": "text", "text": instruction}], LENS_SCHEMA)
@@ -278,6 +349,9 @@ class OfflineEngine:
 
     def identity(self) -> str:
         return "offline-heuristic-engine (no model)"
+
+    def verify_facts(self, frozen_text: str, ctx: dict, declared: list[str]) -> dict:
+        raise RuntimeError("the offline engine cannot verify facts on the web; set allow_web_verification false")
 
     def transcribe(self, pdf_path: str, pages: int) -> list[str]:
         raise RuntimeError("the offline engine cannot read scanned pages; use engine 'claude'")
@@ -448,6 +522,11 @@ class ReplayEngine:
         return (f"<context>\n{_context_block(ctx)}\n</context>\n\n"
                 f"<frozen_document>\n{frozen_text}\n</frozen_document>")
 
+    def verify_facts(self, frozen_text: str, ctx: dict, declared: list[str]) -> dict:
+        prompt = (f"<system>\n{VERIFY_SYSTEM}\n</system>\n\n{self._doc(frozen_text, ctx)}\n\n"
+                  "Declared facts to verify: " + ("; ".join(declared) or "none"))
+        return self._load("verify", prompt, VERIFY_SCHEMA)
+
     def transcribe(self, pdf_path: str, pages: int) -> list[str]:
         raise RuntimeError("chat-emulated mode needs a text layer; transcribe first")
 
@@ -455,7 +534,7 @@ class ReplayEngine:
         L = spec.LENSES[lens]
         return (f"<system>\n{PROTOCOL_SYSTEM}\n</system>\n\n{self._doc(frozen_text, ctx)}\n\n"
                 f"<lens>\n{L['name']} ({L['sanskrit']})\nThe question it asks: {L['question']}\n\n"
-                f"Charter:\n{charter}\n</lens>\n\nRead the frozen document through this lens only.")
+                f"Charter:\n{charter}\n</lens>{_lens_extra(lens, ctx)}\n\nRead the frozen document through this lens only.")
 
     def read_lens(self, lens: str, charter: str, frozen_text: str, ctx: dict) -> dict:
         return self._load(f"lens_{lens}", self.lens_prompt(lens, charter, frozen_text, ctx), LENS_SCHEMA)

@@ -238,6 +238,31 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
+_PROOF_CHECKS = [
+    (re.compile(r"(?<![@\w.])[A-Za-z]{2,}\.[a-z]{2,}\b(?![@.\w]*@)(?!\.(?:com|org|in|net|io)\b)"), "no space after a full stop"),
+    (re.compile(r"\w- \w"), "hyphen standing in for a dash, or a stray space after a hyphen"),
+    (re.compile(r"\w -\w"), "stray space before a hyphen"),
+    (re.compile(r"\w\s+[,;:](?!\S*\d)"), "space before punctuation"),
+    (re.compile(r"\b(\w{3,})\s+\1\b", re.I), "repeated word"),
+    (re.compile(r"\w\(|\)\w"), "missing space around a parenthesis"),
+]
+
+
+def proof_candidates(docs: list[FrozenDoc], limit: int = 30) -> list[dict]:
+    """Mechanical proof candidates on the rendered text. Hints for Architecture, never findings."""
+    out, emails = [], re.compile(r"\S+@\S+")
+    for d in docs:
+        artifact_lines = {(a["page"], a["line"]) for a in d.artifacts}
+        for ln in d.lines:
+            text = emails.sub("", ln["text"])
+            for rx, why in _PROOF_CHECKS:
+                m = rx.search(text)
+                if m:
+                    out.append({"at": f"D{d.index} p{ln['page']} L{ln['line']}", "check": why,
+                                "match": m.group(0), "line_had_artifacts": (ln["page"], ln["line"]) in artifact_lines})
+    return out[:limit]
+
+
 def _meta_date(v: str) -> str:
     """PDF dates look like D:20250810172629+00'00'; show them as 2025-08-10."""
     m = re.match(r"D:(\d{4})(\d{2})(\d{2})", v)

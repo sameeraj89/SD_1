@@ -56,3 +56,28 @@ def test_refusal_is_raised():
     eng, _ = engine({}, stop_reason="refusal")
     with pytest.raises(RefusalError):
         eng.read_lens("prudence", "c", "[D1 p1 L1] x", CTX)
+
+
+def test_verify_facts_uses_web_search_then_structures():
+    class Seq:
+        def __init__(self):
+            self.calls = []
+        def create(self, **kw):
+            self.calls.append(kw)
+            n = len(self.calls)
+            if n == 1:  # research turn paused mid-search
+                return SimpleNamespace(model="claude-opus-5", stop_reason="pause_turn",
+                                       content=[SimpleNamespace(type="text", text="searching")])
+            if n == 2:
+                return SimpleNamespace(model="claude-opus-5", stop_reason="end_turn",
+                                       content=[SimpleNamespace(type="text", text="Onfido acquired by Entrust, 2024.")])
+            return SimpleNamespace(model="claude-opus-5", stop_reason="end_turn", content=[SimpleNamespace(
+                type="text", text=json.dumps({"facts": [{"claim": "c", "quote": "q", "status": "verified",
+                                                         "finding": "2024", "sources": ["https://x"]}]}))])
+    msgs = Seq()
+    eng = ClaudeEngine(client=SimpleNamespace(beta=SimpleNamespace(messages=msgs)))
+    out = eng.verify_facts("[D1 p1 L1] acquired by Entrust", CTX, [])
+    assert out["facts"][0]["status"] == "verified"
+    assert msgs.calls[0]["tools"][0]["type"] == "web_search_20260209"
+    assert msgs.calls[1]["messages"][-1]["role"] == "assistant"  # continued after pause_turn
+    assert "tools" not in msgs.calls[2] and msgs.calls[2]["output_config"]["format"]["type"] == "json_schema"

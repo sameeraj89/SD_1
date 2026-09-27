@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-SPEC_VERSION = "2.5-proto"
+SPEC_VERSION = "2.6-proto"
 MAX_CYCLES = 2  # I4: at most two corrective cycles per version
 
 # ---------------------------------------------------------------- lenses ---
@@ -120,7 +120,7 @@ PROFILES: dict[str, dict] = {
             # pack slide 24
             "prudence": "Risk and diligence signals: tenures, gaps, associations, and claims that would matter in a governance-sensitive appointment.",
             "veracity": "Internal consistency and verifiability: dates, arithmetic, undated roles, unverifiable superlatives, tense drift, currency of the document against the as-of date.",
-            "architecture": "The document as a construction: structure and finish, and what its craft says relative to its claims.",
+            "architecture": "The document as a construction: structure and finish, and what its craft says relative to its claims. Proofread line by line as rendered: a missing space after a full stop or around a parenthesis, a hyphen standing in for a dash, number or agreement slips, repeated words, stray spaces before punctuation, inconsistent date formats. Proof candidates flagged mechanically at freeze are listed for you; check each against the line and report only the genuine ones. Name every genuine defect; one finding may list several, quoting the first. Spacing quarantined as an extraction artifact at freeze is not a defect.",
             "positioning": "The career as strategy: trajectory, transitions, timing, and what the profile is built toward. If a requisition is given, read against it. Read the tenure pattern (how long each role lasted, and whether it stabilises) and the staff-versus-line character of the roles against the self-description. Read timing: when the document was authored (freeze-record metadata) relative to the start of the current role, and what that implies about present motivation; frame it as a probe, never as an inference about the person.",
             "purpose": "Fitness of the instrument for its audience and mandate: what it evidences, and what it omits.",
             "detachment": "Bias control on the reading itself: halo and taint by association resisted with equal force. Apply the familiarity-bias guard for any standing disclosure.",
@@ -130,7 +130,8 @@ PROFILES: dict[str, dict] = {
         "tier_anchors": [
             "material: a current or 'Present' role, or the document as a whole, more than 12 months past the document's authored date at the as-of date, so the record cannot show the candidate's present position",
             "material: a cluster of outcome claims inside a standing disclosure, which must be adjudicated first-hand by the Owner before anyone relies on it",
-            "material: a tenure, association or event that would decide a governance-sensitive appointment (for example, a firm later charged with fraud)",
+            "material: an adverse event attributed to a firm during or around the candidate's tenure there (regulatory charges, sanctions, fraud, a collapse the candidate is not credited with resolving) that would decide a governance-sensitive appointment",
+            "not adverse in itself: a restructuring, turnaround or rescue the candidate is credited with helping resolve; read it as an outcome claim (and, inside a standing disclosure, reserve it to the Owner with the rest of that cluster)",
             "corrective: a true fact imported beyond its scope, such as a later corporate outcome presented inside an earlier role, or an aggregate that conflates funds stewarded with capital raised",
             "corrective: a scale claim extraordinary for the stated title or tenure, needing referee verification",
             "corrective: a senior role missing a start or end date, or tense drift that leaves a role's status unclear",

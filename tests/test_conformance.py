@@ -371,3 +371,51 @@ def test_tier_anchors_reach_every_lens(tmp_path, pack):
     r.open_and_freeze(req(pack("candidate_cv.txt"), profile="cv"))
     r.audit()
     assert all(any("12 months" in a for a in c["ctx"]["tier_anchors"]) for c in eng.calls)
+
+
+# ------------------------------------------- freeze-time fact checking ---
+
+def test_audit_refused_until_facts_verified_then_facts_reach_lenses(tmp_path, pack):
+    class Checker(OfflineEngine):
+        def verify_facts(self, text, ctx, declared):
+            return {"facts": [{"claim": "Land allotment policy exists", "quote": "free cancer day-care centre",
+                               "status": "verified", "finding": "Policy notified in 2024.",
+                               "sources": ["https://example.org/policy"]}]}
+    eng = Checker()
+    r = Run(str(tmp_path / "wd"), engine=eng)
+    r.open_and_freeze(req(pack(), allow_web_verification=True))
+    with pytest.raises(GuardRefusal, match="verified at the freeze"):
+        r.audit()
+    facts = r.verify_contemporary_facts()
+    assert facts[0]["location"].startswith("D1 p1")
+    r.audit()
+    assert all("VERIFIED: Land allotment policy exists" in c["text"] for c in eng.calls)
+    assert [e for e in r.register.events(r.run_id) if e["kind"] == "facts.verified"]
+
+
+def test_fact_check_needs_permission(tmp_path, pack):
+    r = Run(str(tmp_path / "wd"), engine=OfflineEngine())
+    r.open_and_freeze(req(pack()))
+    with pytest.raises(GuardRefusal, match="not allowed"):
+        r.verify_contemporary_facts()
+
+
+def test_proof_candidates_reach_architecture_only(tmp_path):
+    from saptadrishti.engine import ReplayEngine, PendingExchange
+    p = tmp_path / "cv.txt"
+    p.write_text("Institute (Govt.of UP) respectively.\nacross the care continuum- early screening\n")
+    ex = tmp_path / "ex"
+    eng = ReplayEngine(str(ex))
+    r = Run(str(tmp_path / "wd"), engine=eng)
+    r.open_and_freeze(req(str(p), profile="cv"))
+    for lens in ("architecture", "veracity"):
+        with pytest.raises(PendingExchange):
+            eng.read_lens(lens, spec.charter_for(lens, "cv"), r.state["frozen_text"], r._ctx())
+    arch = (ex / "prompt_lens_architecture.txt").read_text()
+    assert "<proof_candidates>" in arch and "Govt.of" in arch and "m- e" in arch
+    assert "<proof_candidates>" not in (ex / "prompt_lens_veracity.txt").read_text()
+
+
+def test_restructuring_is_not_an_adverse_anchor():
+    anchors = " ".join(spec.tier_anchors("cv"))
+    assert "not adverse in itself" in anchors and "charges" in anchors

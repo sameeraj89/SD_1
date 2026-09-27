@@ -24,7 +24,7 @@ from dataclasses import asdict
 
 from . import spec
 from .engine import Engine, make_engine
-from .freeze import FrozenDoc, freeze_file, locate, render_for_reading, verify
+from .freeze import FrozenDoc, freeze_file, locate, proof_candidates, render_for_reading, verify
 from .register import Register
 from .request import RunRequest
 from .vault import Vault
@@ -150,6 +150,7 @@ class Run:
             "prior_adjudications": self.state.get("prior_adjudications", []),
             "needs_signatory": req["profile"] in ("general", "clinical", "legal"),
             "tier_anchors": spec.tier_anchors(req["profile"]),
+            "proof_candidates": proof_candidates(self._docs()) if self.state.get("docs") else [],
         }
 
     # ============================================================ Phase 0
@@ -178,6 +179,43 @@ class Run:
         self._set("frozen")
         return run_id
 
+    def verify_contemporary_facts(self) -> list[dict]:
+        """Phase 0, continued: contemporary public facts verified at the freeze, or reported unverified.
+
+        Runs only when the request allows web verification. The results are
+        appended to the frozen text as freeze-record lines, so every lens
+        reads the same verified context. Searches concern third-party public
+        facts only, never the subject's name or personal identifiers.
+        """
+        req = self.state["request"]
+        if self.state["status"] != "frozen":
+            raise GuardRefusal("facts are verified at the freeze, before the audit")
+        if not req["allow_web_verification"]:
+            raise GuardRefusal("web verification is not allowed by this request")
+        if self.state.get("facts_verified"):
+            return self.state["verified_facts"]
+        self._check_invariants("fact_verification")
+        out = self.engine.verify_facts(self.state["frozen_text"], self._ctx(), req["contemporary_facts"])
+        facts = []
+        for f in out.get("facts", []):
+            loc = locate(self._docs(), f.get("quote", "")) if f.get("quote") else None
+            facts.append({**f, "location": loc or "-"})
+        lines = ["=== FREEZE RECORD: CONTEMPORARY FACTS CHECKED AT FREEZE "
+                 f"({dt.date.today().isoformat()}; third-party public facts only) ==="]
+        for f in facts:
+            src = "; ".join(f.get("sources", [])[:3]) or "no source"
+            lines.append(f"[{f['location']}] {f['status'].upper()}: {f['claim']} - {f['finding']} (sources: {src})")
+        if not facts:
+            lines.append("No contemporary public facts required verification.")
+        self.state["frozen_text"] += "\n" + "\n".join(lines)
+        self.state["verified_facts"] = facts
+        self.state["facts_verified"] = True
+        self._event("facts.verified", {"count": len(facts),
+                                       "statuses": [f["status"] for f in facts],
+                                       "claims": [f["claim"][:80] for f in facts]})
+        self._save()
+        return facts
+
     def _inherit_prior(self, prior_id: str) -> None:
         prior = Run.load(self.workdir, prior_id, engine=self.engine)
         if prior.state["request"]["cycle"] >= spec.MAX_CYCLES:
@@ -197,6 +235,8 @@ class Run:
         if self.state["status"] not in ("frozen", "paused"):
             raise GuardRefusal(f"audit cannot start from state {self.state['status']}")
         self._check_invariants("audit")
+        if self.state["request"]["allow_web_verification"] and not self.state.get("facts_verified"):
+            raise GuardRefusal("REFUSED: contemporary facts must be verified at the freeze before the audit")
         self._set("auditing")
         req = self.state["request"]
         text, ctx = self.state["frozen_text"], self._ctx()

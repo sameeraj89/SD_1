@@ -87,6 +87,11 @@ def run_record_markdown(state: dict, register_events: list[dict]) -> str:
         f"| Requisition | {req['requisition'] or 'None stated; the record adjudicates the document in general terms.'} |",
         f"| Contemporary facts | {'; '.join(req['contemporary_facts']) or 'None declared.'}"
         f"{' Web verification permitted.' if req['allow_web_verification'] else ' No web sources used.'} |",
+    ]
+    for f in state.get("verified_facts", []):
+        out.append(f"| Fact checked at freeze | {f['status'].title()}: {f['claim']} — {f['finding']} "
+                   f"({'; '.join(f.get('sources', [])[:2]) or 'no source'}) |")
+    out += [
         f"| Edition · Profile | {prof['label']} |",
         f"| Specification | v{state['spec_version']} · Cycle {req['cycle']} |",
         f"| Method hash | `{state['method_hash'][:16]}…` (sealed charters) |",
