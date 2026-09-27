@@ -93,8 +93,8 @@ class RunRequest:
             raise RequestError(f"cycle must be 1..{spec.MAX_CYCLES} (two-cycle cap, I4)")
         if self.cycle > 1 and not self.prior_run_id:
             raise RequestError("cycle 2 requires prior_run_id")
-        if self.engine not in ("claude", "offline"):
-            raise RequestError("engine must be 'claude' or 'offline'")
+        if self.engine not in ("claude", "offline", "replay"):
+            raise RequestError("engine must be claude, offline or replay")
         if not self.as_of:
             self.as_of = dt.date.today().isoformat()
         if not self.audience:
@@ -138,7 +138,7 @@ REQUEST_JSON_SCHEMA = {
         "cycle": {"type": "integer", "minimum": 1, "maximum": spec.MAX_CYCLES},
         "prior_run_id": {"type": "string"},
         "model": {"type": "string"},
-        "engine": {"enum": ["claude", "offline"]},
+        "engine": {"enum": ["claude", "offline", "replay"]},
         "effort": {"enum": ["low", "medium", "high", "xhigh", "max"]},
     },
     "additionalProperties": False,

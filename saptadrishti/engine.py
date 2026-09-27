@@ -400,7 +400,77 @@ class OfflineEngine:
         return {"revised_text": text, "changes": changes}
 
 
+# ================================================= Chat-emulated engine ===
+
+class PendingExchange(RuntimeError):
+    """The model output for this step has not been supplied yet."""
+
+
+class ReplayEngine:
+    """Chat-emulated mode ("run emulated in conversation, not on the server").
+
+    The exact prompts the Claude engine would send are written to an exchange
+    directory; the outputs are produced elsewhere (one isolated conversation
+    per lens) and dropped back as JSON. Everything downstream (citation gate,
+    reconciliation checks, gates, register) is identical to a server run.
+    """
+
+    def __init__(self, exchange_dir: str, label: str = "Claude (Anthropic), one isolated conversation per lens"):
+        import os
+
+        self.dir = exchange_dir
+        self.label = label
+        os.makedirs(exchange_dir, exist_ok=True)
+
+    def identity(self) -> str:
+        return f"chat-emulated · {self.label} · not on the server"
+
+    def _path(self, name: str) -> str:
+        import os
+        return os.path.join(self.dir, name)
+
+    def _load(self, name: str, prompt: str, schema: dict) -> dict:
+        import os
+        with open(self._path(f"prompt_{name}.txt"), "w", encoding="utf-8") as f:
+            f.write(prompt + "\n\n<output_schema>\n" + json.dumps(schema, indent=1) + "\n</output_schema>\n")
+        p = self._path(f"out_{name}.json")
+        if not os.path.exists(p):
+            raise PendingExchange(f"awaiting {p}")
+        with open(p, encoding="utf-8") as f:
+            return json.load(f)
+
+    @staticmethod
+    def _doc(frozen_text: str, ctx: dict) -> str:
+        return (f"<context>\n{_context_block(ctx)}\n</context>\n\n"
+                f"<frozen_document>\n{frozen_text}\n</frozen_document>")
+
+    def transcribe(self, pdf_path: str, pages: int) -> list[str]:
+        raise RuntimeError("chat-emulated mode needs a text layer; transcribe first")
+
+    def lens_prompt(self, lens: str, charter: str, frozen_text: str, ctx: dict) -> str:
+        L = spec.LENSES[lens]
+        return (f"<system>\n{PROTOCOL_SYSTEM}\n</system>\n\n{self._doc(frozen_text, ctx)}\n\n"
+                f"<lens>\n{L['name']} ({L['sanskrit']})\nThe question it asks: {L['question']}\n\n"
+                f"Charter:\n{charter}\n</lens>\n\nRead the frozen document through this lens only.")
+
+    def read_lens(self, lens: str, charter: str, frozen_text: str, ctx: dict) -> dict:
+        return self._load(f"lens_{lens}", self.lens_prompt(lens, charter, frozen_text, ctx), LENS_SCHEMA)
+
+    def reconcile(self, findings: list[dict], frozen_text: str, ctx: dict) -> dict:
+        prompt = (f"<system>\n{RECONCILE_SYSTEM}\n</system>\n\n{self._doc(frozen_text, ctx)}\n\n"
+                  "<lens_findings>\n" + json.dumps(findings, ensure_ascii=False, indent=1) + "\n</lens_findings>")
+        return self._load("reconcile", prompt, RECONCILE_SCHEMA)
+
+    def rewrite(self, frozen_text: str, accepted: list[dict], ctx: dict) -> dict:
+        prompt = (f"<system>\n{REWRITE_SYSTEM}\n</system>\n\n{self._doc(frozen_text, ctx)}\n\n"
+                  "<accepted_findings>\n" + json.dumps(accepted, ensure_ascii=False, indent=1) + "\n</accepted_findings>")
+        return self._load("rewrite", prompt, REWRITE_SCHEMA)
+
+
 def make_engine(kind: str, model: str = "claude-opus-5", effort: str = "high") -> Engine:
     if kind == "offline":
         return OfflineEngine()
+    if kind == "replay":
+        import os
+        return ReplayEngine(os.environ.get("SD_EXCHANGE_DIR", ".sd/exchange"))
     return ClaudeEngine(model=model, effort=effort)

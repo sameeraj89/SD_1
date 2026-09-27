@@ -146,7 +146,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(prog="sd", description="SaptaDrishti review-gate prototype")
     p.add_argument("--workdir", default=os.environ.get("SD_WORKDIR", ".sd"))
     sub = p.add_subparsers(dest="cmd", required=True)
-    s = sub.add_parser("run"); s.add_argument("request"); s.add_argument("--engine", choices=["claude", "offline"]); s.add_argument("--html", action="store_true"); s.set_defaults(fn=cmd_run)
+    s = sub.add_parser("run"); s.add_argument("request"); s.add_argument("--engine", choices=["claude", "offline", "replay"]); s.add_argument("--html", action="store_true"); s.set_defaults(fn=cmd_run)
     s = sub.add_parser("decide"); s.add_argument("run"); s.add_argument("--owner", required=True); s.add_argument("--decisions"); s.add_argument("--all", choices=["accept", "reject", "residual_risk", "adjudicate"]); s.add_argument("--note"); s.set_defaults(fn=cmd_decide)
     s = sub.add_parser("rewrite"); s.add_argument("run"); s.set_defaults(fn=cmd_rewrite)
     s = sub.add_parser("sign"); s.add_argument("run"); s.add_argument("--releaser", required=True); s.add_argument("--meaning", default="Authorised for release"); s.set_defaults(fn=cmd_sign)

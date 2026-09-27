@@ -315,3 +315,25 @@ def test_scanned_pdf_needs_transcriber(tmp_path):
         freeze_file(1, str(p))
     d = freeze_file(1, str(p), transcriber=lambda path, n: ["Transcribed line one\nLine two"])
     assert not d.text_layer and d.lines[0]["text"] == "Transcribed line one"
+
+
+# ------------------------------------------------ chat-emulated engine ---
+
+def test_replay_engine_writes_prompts_then_consumes_outputs(tmp_path, pack):
+    from saptadrishti.engine import PendingExchange, ReplayEngine
+    ex = tmp_path / "ex"
+    eng = ReplayEngine(str(ex))
+    r = Run(str(tmp_path / "wd"), engine=eng)
+    r.open_and_freeze(req(pack()))
+    with pytest.raises(PendingExchange):
+        eng.read_lens("prudence", "c", r.state["frozen_text"], r._ctx())
+    assert (ex / "prompt_lens_prudence.txt").read_text().count("<frozen_document>") == 1
+    for lens in spec.LENSES:
+        (ex / f"out_lens_{lens}.json").write_text(json.dumps({"reading": "r", "findings": [{
+            "tier": "material", "finding": "projection as fact", "quote": "will treat 30,000 patients",
+            "evidence_state": "present", "remedy_class": "restate", "disposition": "", "probe": ""}]}))
+    r.audit()
+    with pytest.raises(PendingExchange):
+        r.reconcile()
+    assert r.state["status"] == "audited"  # nothing advanced without the output
+    assert "chat-emulated" in r.state["model_identity"]
