@@ -530,8 +530,35 @@ class ReplayEngine:
                   "Declared facts to verify: " + ("; ".join(declared) or "none"))
         return self._load("verify", prompt, VERIFY_SCHEMA)
 
+    TRANSCRIBE_SCHEMA = {
+        "type": "object",
+        "properties": {"pages": {"type": "array", "items": {"type": "string"}}},
+        "required": ["pages"], "additionalProperties": False,
+    }
+
     def transcribe(self, pdf_path: str, pages: int) -> list[str]:
-        raise RuntimeError("chat-emulated mode needs a text layer; transcribe first")
+        """Scanned pages: render each page to an image once; the transcription is produced
+        elsewhere from those images and frozen. Illegible or cropped characters are marked [?]."""
+        import os
+        import pymupdf
+
+        imgs = []
+        with pymupdf.open(pdf_path) as d:
+            for i, p in enumerate(d, 1):
+                out = self._path(f"page_{i:02d}.png")
+                if not os.path.exists(out):
+                    p.get_pixmap(dpi=150).save(out)
+                imgs.append(out)
+        prompt = ("<system>\nTranscribe the document verbatim, page by page, as rendered. Preserve line breaks; "
+                  "render tables as pipe-separated rows, one row per line; mark handwriting as [handwritten: ...]. "
+                  "Mark any illegible or cropped character as [?]. Add nothing, correct nothing, summarise nothing. "
+                  "Include running headers and footers once per page.\n</system>\n\n"
+                  f"The document has {pages} pages, rendered as these images, in order:\n"
+                  + "\n".join(imgs) + "\n\nReturn one string per page.")
+        out = self._load("transcribe", prompt, self.TRANSCRIBE_SCHEMA)
+        if len(out["pages"]) != pages:
+            raise RuntimeError(f"transcription returned {len(out['pages'])} pages for a {pages}-page document")
+        return out["pages"]
 
     def lens_prompt(self, lens: str, charter: str, frozen_text: str, ctx: dict) -> str:
         L = spec.LENSES[lens]

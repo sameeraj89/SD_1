@@ -476,3 +476,24 @@ def test_reconciled_findings_carry_fact_refs(tmp_path, pack):
     r = _run_with(tmp_path, pack, [_f("The Joint Secretary told me privately", ["F1"])])
     r.reconcile()
     assert all(f["fact_refs"] == ["F1"] for f in r.state["findings"])
+
+
+def test_replay_transcribes_scanned_pages_from_rendered_images(tmp_path):
+    from pypdf import PdfWriter
+    from saptadrishti.engine import PendingExchange, ReplayEngine
+    p = tmp_path / "scan.pdf"
+    w = PdfWriter()
+    w.add_blank_page(width=200, height=200)
+    w.add_blank_page(width=200, height=200)
+    w.write(str(p))
+    ex = tmp_path / "ex"
+    r = Run(str(tmp_path / "wd"), engine=ReplayEngine(str(ex)))
+    with pytest.raises(PendingExchange):
+        r.open_and_freeze(req(str(p), profile="clinical"))
+    assert (ex / "page_01.png").exists() and (ex / "page_02.png").exists()
+    (ex / "out_transcribe.json").write_text(json.dumps({"pages": ["Diagnosis: chest infection", "Cropped value [?]50*"]}))
+    r2 = Run(str(tmp_path / "wd"), engine=ReplayEngine(str(ex)))
+    r2.open_and_freeze(req(str(p), profile="clinical"))
+    d = r2.state["docs"][0]
+    assert not d["text_layer"] and d["lines"][1]["text"] == "Cropped value [?]50*"
+    assert "read as rendered images" in r2.state["frozen_text"]
