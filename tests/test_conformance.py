@@ -528,3 +528,24 @@ def test_clinical_anchors_cover_the_safety_cases():
     for phrase in ("absent from the diagnosis, plan or follow-up", "overdue at the as-of date",
                    "duplicate dosing", "contradicted by values printed", "cropped value"):
         assert phrase in anchors
+
+
+def test_pptx_freezes_one_page_per_slide(tmp_path):
+    from pptx import Presentation
+    from pptx.util import Inches
+    prs = Presentation()
+    s1 = prs.slides.add_slide(prs.slide_layouts[1])
+    s1.shapes.title.text = "The seven Standards"
+    s1.placeholders[1].text = "Prudence guards confidences"
+    s1.notes_slide.notes_text_frame.text = "Say it slowly"
+    s2 = prs.slides.add_slide(prs.slide_layouts[5])
+    tbl = s2.shapes.add_table(2, 2, Inches(1), Inches(2), Inches(4), Inches(1)).table
+    tbl.cell(0, 0).text, tbl.cell(0, 1).text = "Regime", "Contribution"
+    tbl.cell(1, 0).text, tbl.cell(1, 1).text = "EU AI Act", "Evidence toward duties"
+    p = tmp_path / "pack.pptx"
+    prs.save(str(p))
+    d = freeze_file(1, str(p))
+    assert d.pages == 2 and d.text_layer
+    texts = [(l["page"], l["text"]) for l in d.lines]
+    assert (1, "Speaker notes: Say it slowly") in texts and (2, "EU AI Act | Evidence toward duties") in texts
+    assert locate([d], "Prudence guards confidences") == "D1 p1 L2"

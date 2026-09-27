@@ -49,6 +49,7 @@ def _media_type(path: str) -> str:
         ".txt": "text/plain",
         ".md": "text/markdown",
         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     }.get(ext, "application/octet-stream")
 
 
@@ -128,6 +129,41 @@ def _rendered_pages(path: str) -> list[str] | None:
         return [p.get_text("text") for p in d]
 
 
+def _pptx_pages(path: str) -> tuple[list[str], dict]:
+    """One page per slide: text frames and table rows in shape order, then speaker notes."""
+    try:
+        from pptx import Presentation
+        from pptx.enum.shapes import MSO_SHAPE_TYPE
+    except ImportError as e:  # pragma: no cover
+        raise FreezeError("python-pptx is required to freeze .pptx packs") from e
+    prs = Presentation(path)
+    cp = prs.core_properties
+    meta = {k: str(v) for k, v in {
+        "author": cp.author, "created": cp.created, "modified": cp.modified,
+        "title": cp.title, "revision": cp.revision, "last_modified_by": cp.last_modified_by,
+    }.items() if v}
+
+    def walk(shapes, out):
+        for sh in shapes:
+            if sh.shape_type == MSO_SHAPE_TYPE.GROUP:
+                walk(sh.shapes, out)
+                continue
+            if getattr(sh, "has_table", False) and sh.has_table:
+                for row in sh.table.rows:
+                    out.append(" | ".join(" ".join(c.text.split()) for c in row.cells))
+            elif sh.has_text_frame and sh.text_frame.text.strip():
+                out.extend(p.text for p in sh.text_frame.paragraphs if p.text.strip())
+
+    pages = []
+    for slide in prs.slides:
+        lines: list[str] = []
+        walk(slide.shapes, lines)
+        if slide.has_notes_slide and slide.notes_slide.notes_text_frame.text.strip():
+            lines.append("Speaker notes: " + " ".join(slide.notes_slide.notes_text_frame.text.split()))
+        pages.append("\n".join(lines))
+    return pages, meta
+
+
 def _docx_pages(path: str) -> tuple[list[str], dict]:
     try:
         import docx  # python-docx
@@ -191,6 +227,8 @@ def freeze_file(index: int, path: str, transcriber=None) -> FrozenDoc:
         pages, meta = _pdf_pages(path)
     elif media.endswith("wordprocessingml.document"):
         pages, meta = _docx_pages(path)
+    elif media.endswith("presentationml.presentation"):
+        pages, meta = _pptx_pages(path)
     elif media.startswith("text/"):
         with open(path, encoding="utf-8") as f:
             pages = f.read().split("\f")

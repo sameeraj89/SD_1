@@ -165,7 +165,7 @@ VERIFY_SYSTEM = """You are the freeze-time fact check of the SaptaDrishti review
 Identify the contemporary PUBLIC facts the frozen document asserts about third parties (companies, institutions, transactions, ownership, prices, dates of corporate events) and verify each against public sources on the web. Also verify any facts the requester declared.
 
 Rules:
-- Verify third-party public facts only. Never search for the document's subject by name, and never search email addresses, phone numbers or other personal identifiers. Personal claims (roles held, achievements) are not checked here; the lenses and referees handle them.
+- Verify third-party public facts only. Never search for the document's subject by name, and never search email addresses, phone numbers or other personal identifiers. Never try to identify a person, firm or case that the document has anonymised; if a fact can only be checked by re-identifying it, report it unverified. Personal claims (roles held, achievements) are not checked here; the lenses and referees handle them.
 - For each fact: "claim" states it neutrally; "quote" copies the document line it appears on, verbatim (without the [D p L] address); "status" is verified, contradicted or unverified; "finding" states what the sources show, with dates where relevant (e.g. when a transaction completed, whether a price was officially disclosed); "sources" lists the URLs relied on.
 - Report what sources say; do not judge the subject. Where sources disagree or are only press reports, say so.
 - At most 6 facts, the most consequential first."""
