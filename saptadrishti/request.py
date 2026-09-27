@@ -55,6 +55,9 @@ class RunRequest:
     contains_personal_data: bool = True
     purge_if_not_proceeding: bool = True
     retention_days: int = 3650                    # "A 10-year floor"
+    distribution: str = ""                        # who may receive the record; profile default if blank
+    route: str = ""                               # how it travels; profile default if blank
+    contact: str = ""                             # who to ask about a reading (compiler / Owner's office)
 
     # --- run control ----------------------------------------------------------
     cycle: int = 1
@@ -135,6 +138,9 @@ REQUEST_JSON_SCHEMA = {
         "contains_personal_data": {"type": "boolean"},
         "purge_if_not_proceeding": {"type": "boolean"},
         "retention_days": {"type": "integer", "minimum": 1},
+        "distribution": {"type": "string"},
+        "route": {"type": "string"},
+        "contact": {"type": "string"},
         "cycle": {"type": "integer", "minimum": 1, "maximum": spec.MAX_CYCLES},
         "prior_run_id": {"type": "string"},
         "model": {"type": "string"},

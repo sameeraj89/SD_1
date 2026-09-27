@@ -70,6 +70,8 @@ class App:
         out = {k: v for k, v in s.items() if k not in ("frozen_text",)}
         out["error"] = self.errors.get(rid)
         out["lenses_done"] = sorted(s.get("lens_outputs", {}))
+        if s.get("verdict"):
+            out["verdict_line"] = report.verdict_line(s)
         if s.get("status") not in ("purged", "opened", "frozen", "auditing"):
             out["record_md"] = report.run_record_markdown(s, ev)
         out["register"] = ev

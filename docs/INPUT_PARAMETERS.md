@@ -27,6 +27,7 @@ on*. If a record shows it, the run had to be given it or had to compute it.
 | `contemporary_facts[]` + `allow_web_verification` | list + bool | no | *"<named> transaction verified against public record at freeze (Clause 4.3)"*; *"No web sources were needed or used"* |
 | `contains_personal_data` | bool | default true | *"Internal record — contains candidate personal data; anonymise before any circulation"* |
 | `purge_if_not_proceeding`, `retention_days` | bool, int (default 3650) | no | *"purged if the file does not proceed"*; *"A 10-year floor"* |
+| `distribution`, `route`, `contact` | text; profile defaults if blank | no | Added after the case-history run found a record about possibly undisclosed findings with *"no recipient or handling line, no route, no retention note, and no named compiler"*; printed in the record's release section |
 | `cycle` | 1 or 2 | default 1 | *"Cycle 1 verdict: corrective … Cycle 2 is reserved"*; *"At most two corrective cycles per version"* |
 | `prior_run_id` | run id | when cycle = 2 | *"Cycle 2 … honouring the adjudications recorded here and reviewing deltas only"* |
 | `model`, `engine`, `effort` | model id; `claude` or `offline` | defaults | *"model identity: Claude (Anthropic)"*; *"Mode: Chat-emulated run"* vs *"on the server"*; models are *"substitutable beneath the orchestration layer"* |

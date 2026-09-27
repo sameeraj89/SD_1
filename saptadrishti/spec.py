@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-SPEC_VERSION = "2.7-proto"
+SPEC_VERSION = "2.8-proto"
 MAX_CYCLES = 2  # I4: at most two corrective cycles per version
 
 # ---------------------------------------------------------------- lenses ---
@@ -127,6 +127,11 @@ PROFILES: dict[str, dict] = {
             "stewardship": "Handling of the person behind the paper: identifiers, protected data (photo, DOB, sex, family), retention, purge, dignity. Also buried strengths the reader should not miss.",
         },
         "probes": True,
+        "handling": {
+            "distribution": "The hiring panel or nomination committee for this mandate only",
+            "route": "Within the firm's own environment; not to the candidate's current employer or referees",
+            "note": "Personal identifiers are held for the run only and purged if the file does not proceed.",
+        },
         "tier_anchors": [
             "material: a current or 'Present' role, or the document as a whole, more than 12 months past the document's authored date at the as-of date, so the record cannot show the candidate's present position",
             "material: a cluster of outcome claims inside a standing disclosure, which must be adjudicated first-hand by the Owner before anyone relies on it",
@@ -154,6 +159,22 @@ PROFILES: dict[str, dict] = {
             "stewardship": "Whether the patient may not have been told; disclosure is for clinicians, in person. Output is suggestions to clinicians, never advice to the patient.",
         },
         "disclaimer": "Compiled with AI assistance from the reports supplied. Not issued by any hospital and not a medical opinion. Points are suggestions to clinicians, not advice to the patient.",
+        "tier_anchors": [
+            "material: a consequential clinical finding (probable malignancy, a critical value, a new organ-threatening result) present in the investigations but absent from the diagnosis, plan or follow-up",
+            "material: a time-bound safety action (re-test, monitoring, dose review) that is overdue at the as-of date, or that is not carried into the points the treating clinician will act on",
+            "material: a medication-safety risk (possible duplicate dosing, a high-risk drug started or changed without duration or monitoring, an interacting combination) not carried into the actionable points",
+            "material: a stated diagnosis or cause contradicted by values printed in the same document, where it drives treatment",
+            "corrective: a statement firmer than its evidence: an uncertain or cropped value stated without its caveat, a status or fitness line with no support in the body, an internal count or date that disagrees",
+            "corrective: record integrity: pages missing, no signatory or responsible author, an improbable value left unremarked",
+            "corrective: findings the patient may not yet know, in a document with no handling, distribution or route line",
+            "moderate: a sequence or timing implied but not dated; inferred dates not marked as inferred",
+            "advisory: presentation, repetition, or method commentary that does not serve the treating clinician",
+        ],
+        "handling": {
+            "distribution": "The treating clinicians named in the audience only",
+            "route": "Clinician to clinician; not to be handed to the patient or family",
+            "note": "Disclosure of any finding the patient may not yet know is for her clinicians, in person.",
+        },
     },
     "credit": {
         "edition": "core",
@@ -242,6 +263,21 @@ GENERAL_TIER_ANCHORS = [
 ]
 
 
+VERDICT_RULE = ("The verdict is the release state of this cycle, not a severity: blocking if any Blocking "
+                "finding stands; corrective if any Material or Corrective finding is open; clean otherwise. "
+                "Severity is shown by the highest tier.")
+
+DEFAULT_HANDLING = {
+    "distribution": "The audience named in the freeze record only",
+    "route": "Direct to the named audience",
+    "note": "",
+}
+
+
+def handling_for(profile: str) -> dict:
+    return {**DEFAULT_HANDLING, **PROFILES[profile].get("handling", {})}
+
+
 def tier_anchors(profile: str) -> list[str]:
     return GENERAL_TIER_ANCHORS + PROFILES[profile].get("tier_anchors", [])
 
@@ -261,6 +297,7 @@ def method_payload() -> dict:
         "tiers": TIERS,
         "canon": CANON,
         "general_tier_anchors": GENERAL_TIER_ANCHORS,
+        "verdict_rule": VERDICT_RULE,
         "remedy_classes": REMEDY_CLASSES,
         "evidence_states": EVIDENCE_STATES,
     }

@@ -47,6 +47,41 @@ def _diff_window(a: str, b: str, pad: int = 24) -> tuple[str, str]:
     return cut(a), cut(b)
 
 
+def verdict_line(state: dict) -> str:
+    """'corrective: not releasable as it stands; highest tier Material'. The bare word alone
+    read as a severity below the findings it summarised."""
+    v = state.get("verdict")
+    if not v:
+        return "pending"
+    findings = state.get("findings", [])
+    top = max((f["tier"] for f in findings), key=lambda t: spec.TIERS[t]["rank"], default=None)
+    meaning = {"blocking": "not releasable; a Blocking finding cannot be waived",
+               "corrective": "not releasable as it stands; open findings need a decision or correction",
+               "clean": "releasable on the two human signatures"}[v]
+    return f"{v}: {meaning}" + (f"; highest tier {top.title()}" if top else "")
+
+
+def release_line(state: dict) -> dict:
+    req = state["request"]
+    d = spec.handling_for(req["profile"])
+    rel = (req.get("releaser") or {}).get("name") or "not yet named"
+    signed = state.get("certificate")
+    return {
+        "compiled_by": f"{state.get('model_identity', 'the review engine')}, for the Owner",
+        "owner": req["owner"]["name"], "releaser": rel,
+        "contact": req.get("contact") or f"{req['owner']['name']} (Owner); no other contact supplied",
+        "distribution": req.get("distribution") or d["distribution"],
+        "route": req.get("route") or d["route"],
+        "personal_data": ("Contains personal data; anonymise before any circulation beyond the distribution above"
+                          if req["contains_personal_data"] else "None declared"),
+        "retention": f"{req['retention_days']} days" + ("; purged by key destruction if the file does not proceed"
+                                                         if req["purge_if_not_proceeding"] else ""),
+        "status": (f"Released {signed['releaser']['at']} by {signed['releaser']['name']}" if signed
+                   else "Not released: this record may not travel beyond the Owner until signed"),
+        "note": d["note"],
+    }
+
+
 def run_record_markdown(state: dict, register_events: list[dict]) -> str:
     req = state["request"]
     prof = spec.PROFILES[req["profile"]]
@@ -148,7 +183,8 @@ def run_record_markdown(state: dict, register_events: list[dict]) -> str:
     counts = {t: sum(1 for f in findings if f["tier"] == t) for t in TIER_ORDER}
     tally = ", ".join(f"{n} {t.title()}" for t, n in counts.items() if n) or "no findings"
     out += ["## F. Verdict and matters reserved to the Owner", "",
-            f"Cycle {req['cycle']} verdict: **{state.get('verdict', 'pending')}** ({tally})."]
+            f"Cycle {req['cycle']} verdict: **{verdict_line(state)}** ({tally}).", "",
+            f"*{spec.VERDICT_RULE}*"]
     if state.get("matters_reserved_to_owner"):
         out += ["", "Decision-insufficient pending:"] + [f"- {m}" for m in state["matters_reserved_to_owner"]]
     if req["cycle"] < spec.MAX_CYCLES and state.get("verdict") != "clean":
@@ -163,7 +199,20 @@ def run_record_markdown(state: dict, register_events: list[dict]) -> str:
                 f"Releaser: {c['releaser']['name']} — {c['releaser']['meaning']} ({c['releaser']['at']})  ",
                 f"Retention: {c['retention_days']} days."]
 
-    out += ["", "## G. Register", "",
+    h = release_line(state)
+    out += ["", "## G. Release, handling and retention", "",
+            "| Field | Entry |", "|---|---|",
+            f"| Compiled by | {h['compiled_by']} |",
+            f"| Owner · Releaser | {h['owner']} · {h['releaser']} |",
+            f"| Contact | {h['contact']} |",
+            f"| Distribution | {h['distribution']} |",
+            f"| Route | {h['route']} |",
+            f"| Personal data | {h['personal_data']} |",
+            f"| Retention | {h['retention']} |",
+            f"| Release status | {h['status']} |"]
+    if h["note"]:
+        out.append(f"| Handling note | {h['note']} |")
+    out += ["", "## H. Register", "",
             f"This run is recorded to the register as Run {rid}, Specification v{state['spec_version']}, "
             f"{prof['label']}, Cycle {req['cycle']} {state.get('verdict', '')}; status {state['status']}. "
             f"{len(register_events)} event(s); chain verified.", "",

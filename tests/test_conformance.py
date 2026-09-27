@@ -497,3 +497,34 @@ def test_replay_transcribes_scanned_pages_from_rendered_images(tmp_path):
     d = r2.state["docs"][0]
     assert not d["text_layer"] and d["lines"][1]["text"] == "Cropped value [?]50*"
     assert "read as rendered images" in r2.state["frozen_text"]
+
+
+# ------------------------------------------- verdict wording and release ---
+
+def test_verdict_line_states_meaning_and_highest_tier(tmp_path, pack):
+    from saptadrishti.report import run_record_markdown, verdict_line
+    r = run_to_owner(tmp_path, pack())
+    line = verdict_line(r.state)
+    assert line.startswith("blocking: not releasable") and line.endswith("highest tier Blocking")
+    md = run_record_markdown(r.state, r.register.events(r.run_id))
+    assert "release state of this cycle, not a severity" in md
+
+
+def test_record_carries_release_handling_and_retention(tmp_path, pack):
+    from saptadrishti.report import run_record_markdown
+    r = run_to_owner(tmp_path, pack("candidate_cv.txt"), profile="clinical", contact="Dr A, records office")
+    md = run_record_markdown(r.state, r.register.events(r.run_id))
+    assert "## G. Release, handling and retention" in md
+    assert "not to be handed to the patient or family" in md and "Dr A, records office" in md
+    assert "Not released: this record may not travel beyond the Owner until signed" in md
+    r2 = run_to_owner(tmp_path / "b", pack("candidate_cv.txt"), profile="cv")
+    r2.decide("Olive Owner", accept_all(r2))
+    r2.sign("Rex Releaser")
+    assert "Released " in run_record_markdown(r2.state, r2.register.events(r2.run_id))
+
+
+def test_clinical_anchors_cover_the_safety_cases():
+    anchors = " ".join(spec.tier_anchors("clinical"))
+    for phrase in ("absent from the diagnosis, plan or follow-up", "overdue at the as-of date",
+                   "duplicate dosing", "contradicted by values printed", "cropped value"):
+        assert phrase in anchors

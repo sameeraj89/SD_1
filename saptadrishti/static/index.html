@@ -120,7 +120,7 @@ async function poll(){clearTimeout(timer);try{const s=await api(`/api/runs/${RID
 function render(s){$("rstatus").textContent=s.status;$("runErr").textContent=s.error||s.abort_reason||"";
   for(const k of Object.keys(META.lenses))$("L-"+k).classList.toggle("done",(s.lenses_done||[]).includes(k));
   const live=["auditing","paused","frozen"].includes(s.status);$("bPause").disabled=$("bStop").disabled=!live;$("bResume").disabled=s.status!=="paused";
-  const f=s.findings||[];$("verdict").textContent=s.verdict?`Verdict: ${s.verdict}. ${s.reconciled_summary||""}`:"";
+  const f=s.findings||[];$("verdict").textContent=s.verdict?`Verdict: ${s.verdict_line||s.verdict}. ${s.reconciled_summary||""}`:"";
   const deciding=s.status==="awaiting_owner";
   $("ftable").innerHTML=f.length?`<tr><th>No.</th><th>Tier</th><th>Lens</th><th>Finding</th><th>Line</th><th>Decision</th></tr>`+f.map(x=>{
     const d=(s.decisions||{})[x.id];const lens=x.lenses.map(l=>META.lenses[l].name).join(" · ");
