@@ -1,0 +1,1140 @@
+<title>SaptaDrishti Ingest</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* Layout: one working column of numbered steps; each step unlocks the next. Tables scroll inside their own frame on phones. */
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#151a22; --muted:#5b6474; --line:#dde1e8;
+  --accent:#2f4fb3; --accent-ink:#ffffff; --gate:#b4232c; --ok:#0f7a4a; --warn:#a16207; --chip:#eef1f5;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10141b; --panel:#171c25; --ink:#e7ebf1; --muted:#9aa3b2; --line:#2a313d;
+  --accent:#8fa8ff; --accent-ink:#10141b; --gate:#f2727a; --ok:#4fd197; --warn:#e3b341; --chip:#222936; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10141b; --panel:#171c25; --ink:#e7ebf1; --muted:#9aa3b2; --line:#2a313d;
+  --accent:#8fa8ff; --accent-ink:#10141b; --gate:#f2727a; --ok:#4fd197; --warn:#e3b341; --chip:#222936; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);margin:0}
+.page{max-width:1040px;margin:0 auto;padding:24px 16px 72px;display:grid;gap:22px}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;text-wrap:balance;margin:0}
+h1{font-size:1.9rem;line-height:1.12}
+h2{font-size:1.2rem}
+h3{font-size:1rem}
+p{margin:0;max-width:74ch}
+.eyebrow{font:500 .72rem/1 var(--f-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.lede{color:var(--muted);margin-top:8px}
+.mono{font-family:var(--f-mono);font-size:.85em}
+.muted{color:var(--muted)}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:14px;min-width:0}
+.step[aria-disabled="true"]{opacity:.55}
+.step > header{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.step > header .n{font:600 .74rem/1 var(--f-mono);color:var(--accent);letter-spacing:.05em}
+.step.gate > header .n{color:var(--gate)}
+.note{border-left:3px solid var(--line);padding:4px 0 4px 12px;color:var(--muted);font-size:.9rem}
+.note.warn{border-color:var(--warn)}
+.refusal{border:1px solid var(--gate);color:var(--gate);border-radius:6px;padding:10px 12px;font-weight:500}
+.refusal:empty{display:none}
+
+.drop{border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;display:grid;gap:6px;cursor:pointer}
+.drop.over{border-color:var(--accent);background:var(--chip)}
+.files{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.files li{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--chip);border-radius:6px;padding:6px 10px;min-width:0}
+.files li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.form .wide{grid-column:1/-1}
+label{display:grid;gap:4px;font-size:.86rem;font-weight:500}
+label small{font-weight:400;color:var(--muted)}
+input[type=text],input[type=date],input[type=number],select,textarea{font:inherit;font-size:.92rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;min-width:0}
+textarea{min-height:64px;resize:vertical}
+.check{display:flex;gap:8px;align-items:center;font-weight:400}
+details summary{cursor:pointer;font-weight:500}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{font:500 .9rem var(--f-body);border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 14px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.danger{border-color:var(--gate);color:var(--gate)}
+button:disabled{opacity:.45;cursor:not-allowed}
+
+.kv{display:grid;grid-template-columns:minmax(120px,200px) 1fr;gap:4px 14px;font-size:.9rem}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+@media (max-width:560px){.kv{grid-template-columns:1fr}.kv dd{margin-bottom:6px}}
+pre.frozen{max-height:320px;overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;font:400 .78rem/1.5 var(--f-mono);white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+
+.lenses{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}
+.lens{border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:4px;min-width:0}
+.lens b{font-family:var(--f-display)}
+.lens .st{font:400 .8rem var(--f-mono);color:var(--muted)}
+.lens.done{border-color:var(--ok)} .lens.done .st{color:var(--ok)}
+.lens.failed{border-color:var(--gate)} .lens.failed .st{color:var(--gate)}
+.lens.busy .st::after{content:"";display:inline-block;width:.6em;height:.6em;margin-left:6px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite alternate}
+@keyframes pulse{from{opacity:.2}to{opacity:1}}
+@media (prefers-reduced-motion: reduce){.lens.busy .st::after{animation:none}}
+
+.verdict{font-family:var(--f-display);font-size:1.15rem;font-weight:600;padding:10px 12px;border-radius:6px;background:var(--chip)}
+.verdict.blocking{color:var(--gate)} .verdict.corrective{color:var(--warn)} .verdict.clean{color:var(--ok)}
+.wrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-top:1px solid var(--line)}
+th{border-top:0;font:500 .7rem/1.3 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+td.id{font-family:var(--f-mono);white-space:nowrap;font-weight:600}
+td.id.blocking{color:var(--gate)} td.id.material{color:var(--warn)}
+td .q{display:block;margin-top:4px;font-style:italic;color:var(--muted)}
+td select{min-width:150px}
+td input{min-width:160px}
+.counts{display:flex;gap:8px;flex-wrap:wrap}
+.counts span{font:500 .8rem var(--f-mono);background:var(--chip);border-radius:4px;padding:3px 8px}
+.foot{color:var(--muted);font-size:.84rem;border-top:1px solid var(--line);padding-top:14px}
+.hidden{display:none !important}
+</style>
+
+<main class="page">
+<header>
+  <div class="eyebrow">Browser edition · runs on your own Claude plan · nothing leaves this tab except the calls to Claude</div>
+  <h1 style="margin-top:8px">SaptaDrishti ingestion window</h1>
+  <p class="lede">Drop a document, say who will rely on it, and the seven-lens review runs here: the file is frozen and hashed in your browser, read seven times in isolation by Claude, checked against its own lines, reconciled, then held for a named Owner and a different named Releaser. Download the run record at the end.</p>
+</header>
+
+<div id="unavailable" class="note warn hidden">This view cannot call Claude, so the reading cannot run. Open the artifact in claude.ai while signed in. You can still freeze a file and inspect what would be sent.</div>
+
+<!-- STEP 1 -->
+<section class="step" id="s1">
+  <header><span class="n">STEP 1</span><h2>Ingest</h2></header>
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose or drop files">
+    <b>Drop files here, or click to choose</b>
+    <span class="muted" id="acceptNote">PDF (text layer), DOCX, PPTX, TXT or MD. Several files are read as one pack.</span>
+    <input type="file" id="fileIn" multiple class="hidden" accept=".pdf,.docx,.pptx,.txt,.md">
+  </div>
+  <ul class="files" id="fileList"></ul>
+
+  <div class="form">
+    <label>Profile
+      <select id="f_profile"></select>
+    </label>
+    <label>As-of date <small>currency is judged against this</small>
+      <input type="date" id="f_as_of">
+    </label>
+    <label class="wide">Audience <small>who will rely on the document</small>
+      <input type="text" id="f_audience">
+    </label>
+    <label class="wide">Purpose or mandate <small>optional</small>
+      <input type="text" id="f_purpose">
+    </label>
+    <label>Owner <small>decides every finding</small>
+      <input type="text" id="f_owner" autocomplete="off">
+    </label>
+    <label>Releaser <small>signs the release; must differ from the Owner</small>
+      <input type="text" id="f_releaser" autocomplete="off">
+    </label>
+    <details class="wide">
+      <summary>More inputs: subject, requisition, standing disclosure, handling</summary>
+      <div class="form" style="margin-top:12px">
+        <label class="wide">Subject <small>optional; a label for the record, never searched</small>
+          <input type="text" id="f_subject">
+        </label>
+        <label class="wide">Requisition <small>what the document is read against, if anything</small>
+          <textarea id="f_requisition"></textarea>
+        </label>
+        <label class="wide">Standing disclosure <small>the Owner's relationship to the subject, if any; claims affected after a semicolon</small>
+          <input type="text" id="f_disclosure" placeholder="Former colleague, 2019–2022; Programme outcomes at Firm X">
+        </label>
+        <label class="wide">External inputs on record <small>one per line</small>
+          <textarea id="f_external"></textarea>
+        </label>
+        <label>Distribution <small>blank = profile default</small>
+          <input type="text" id="f_distribution">
+        </label>
+        <label>Route <small>blank = profile default</small>
+          <input type="text" id="f_route">
+        </label>
+        <label>Contact
+          <input type="text" id="f_contact">
+        </label>
+        <label>Retention (days)
+          <input type="number" id="f_retention" value="90" min="1" max="3650">
+        </label>
+        <label>Model tier <small>Claude tier to ask for; the record shows what answered</small>
+          <select id="f_tier"><option value="complex">complex (recommended)</option><option value="default">default</option></select>
+        </label>
+        <label class="check"><input type="checkbox" id="f_personal" checked> Contains personal data</label>
+        <label class="check"><input type="checkbox" id="f_purge" checked> Purge if the file does not proceed</label>
+      </div>
+    </details>
+  </div>
+  <div class="refusal" id="r1"></div>
+  <div class="row"><button class="primary" id="btnFreeze" disabled>Freeze the pack</button><span class="muted" id="freezeMsg"></span></div>
+</section>
+
+<!-- STEP 2 -->
+<section class="step" id="s2" aria-disabled="true">
+  <header><span class="n">STEP 2</span><h2>Freeze record</h2></header>
+  <div id="freezeOut" class="muted">Nothing frozen yet.</div>
+</section>
+
+<!-- STEP 3 -->
+<section class="step" id="s3" aria-disabled="true">
+  <header><span class="n">STEP 3</span><h2>Seven isolated readings</h2></header>
+  <p class="muted">Each lens is a separate Claude call that sees the frozen text, the context and its own charter only. Then one reconciliation call. About 8 calls on your plan; two run at a time.</p>
+  <div class="lenses" id="lensGrid"></div>
+  <div class="refusal" id="r3"></div>
+  <div class="row">
+    <button class="primary" id="btnRead" disabled>Run the reading</button>
+    <button id="btnStop" disabled>Stop</button>
+    <span class="muted" id="readMsg"></span>
+  </div>
+</section>
+
+<!-- STEP 4 -->
+<section class="step gate" id="s4" aria-disabled="true">
+  <header><span class="n">STEP 4 · GATE 1</span><h2>Findings register and Owner decision</h2></header>
+  <div id="registerOut" class="muted">The register appears after reconciliation.</div>
+  <div id="ownerBox" class="hidden" style="display:grid;gap:10px">
+    <p class="muted">Decide every finding. Reject, residual risk and adjudicate need reasons. A Blocking finding can only be accepted.</p>
+    <div class="row">
+      <label style="flex:1 1 240px">Owner name, as named in step 1<input type="text" id="g_owner" autocomplete="off"></label>
+    </div>
+    <div class="refusal" id="r4"></div>
+    <div class="row"><button class="primary" id="btnDecide">Record decisions</button></div>
+  </div>
+</section>
+
+<!-- STEP 5 -->
+<section class="step gate" id="s5" aria-disabled="true">
+  <header><span class="n">STEP 5 · GATE 2</span><h2>Rewrite, cycle 2, release</h2></header>
+  <div id="releaseOut" class="muted">Follows the Owner decision.</div>
+  <div id="rewriteBox" class="hidden" style="display:grid;gap:10px">
+    <div class="row">
+      <button id="btnRewrite">Propose the integrated rewrite</button>
+      <button id="btnRewriteDl" class="hidden">Download revised text</button>
+      <button id="btnCycle2" class="hidden">Start cycle 2 on the revised text</button>
+      <span class="muted" id="rewriteMsg"></span>
+    </div>
+    <div id="rewriteOut"></div>
+  </div>
+  <div id="signBox" class="hidden" style="display:grid;gap:10px">
+    <div class="form">
+      <label>Releaser name, as named in step 1<input type="text" id="g_releaser" autocomplete="off"></label>
+      <label>Meaning of signature<input type="text" id="g_meaning" value="Authorised for release"></label>
+    </div>
+    <div class="refusal" id="r5"></div>
+    <div class="row"><button class="primary" id="btnSign">Sign the release</button></div>
+  </div>
+</section>
+
+<!-- STEP 6 -->
+<section class="step" id="s6" aria-disabled="true">
+  <header><span class="n">STEP 6</span><h2>Output</h2></header>
+  <p class="muted">The run record can be downloaded at any point after the freeze. It is marked unreleased until the Releaser signs.</p>
+  <div class="row" id="dlRow">
+    <button id="dlHtml" disabled>Run record (.html)</button>
+    <button id="dlMd" disabled>Run record (.md)</button>
+    <button id="dlJson" disabled>Run state (.json)</button>
+    <span class="muted" id="dlMsg"></span>
+  </div>
+  <div class="row">
+    <button class="danger" id="btnPurge" disabled>Purge this run</button>
+    <span class="muted">Clears the document, findings and register from this tab. Nothing is stored anywhere else by this page.</span>
+  </div>
+</section>
+
+<p class="foot">Browser edition of the prototype. Unlike the command-line edition it does not check contemporary public facts on the web; the lenses report such facts as unverified. Model identity is recorded as the tier that answered, not a model name. Findings are suggestions to the named Owner, not a decision.</p>
+</main>
+
+<script>
+"use strict";
+const M = /*@METHOD@*/null;
+const LENS_KEYS = Object.keys(M.lenses);
+const TIER_KEYS = Object.keys(M.tiers);
+const DECISIONS = {
+  accept: "Accept: the remedy is to be applied",
+  adjudicate: "Adjudicate: my first-hand finding replaces it",
+  residual_risk: "Accept residual risk, with reasons",
+  reject: "Reject, with reasons",
+};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const enc = new TextEncoder();
+const now = () => new Date().toISOString().replace(/\.\d+Z$/, "Z");
+
+let SAMPLE = null, DL = null, LIMITS = null;
+let FILES = [];
+let S = null;           // the current run; lives only in this tab
+let CTL = {};           // AbortControllers per call
+
+/* ------------------------------------------------------------ utilities */
+async function sha256(data) {
+  const buf = typeof data === "string" ? enc.encode(data) : data;
+  const h = await crypto.subtle.digest("SHA-256", buf);
+  return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+function stable(v) {
+  if (Array.isArray(v)) return "[" + v.map(stable).join(",") + "]";
+  if (v && typeof v === "object") return "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + stable(v[k])).join(",") + "}";
+  return JSON.stringify(v);
+}
+function norm(s) {
+  return String(s || "").normalize("NFKC").replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
+    .replace(/[–—]/g, "-").replace(/\s+/g, " ").trim().toLowerCase();
+}
+function parseJSON(t) {
+  try { return JSON.parse(t); } catch {}
+  const m = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (m) { try { return JSON.parse(m[1]); } catch {} }
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
+  return null;
+}
+const titleCase = s => s.charAt(0).toUpperCase() + s.slice(1);
+function refuse(box, msg) { $(box).textContent = msg || ""; if (msg) throw new Error("refused"); }
+
+/* Register: append-only events, each hashed over the previous one. */
+let evChain = Promise.resolve();
+function ev(kind, data = {}) {
+  if (!S) return evChain;
+  const run = S;
+  evChain = evChain.then(async () => {
+    const prev = run.events.length ? run.events[run.events.length - 1].hash : "0".repeat(64);
+    const e = { seq: run.events.length + 1, at: now(), kind, data, prev };
+    e.hash = await sha256(stable({ ...e }));
+    run.events.push(e);
+  });
+  return evChain;
+}
+function setStatus(st) { S.status = st; ev("run.status", { status: st }); }
+
+/* ------------------------------------------------------------ the method */
+const profile = () => M.profiles[S.request.profile];
+const handling = () => ({ ...M.default_handling, ...(profile().handling || {}) });
+const tierAnchors = () => [...M.general_tier_anchors, ...(profile().tier_anchors || [])];
+function charterFor(lens) {
+  const base = M.lenses[lens].charter, tuned = (profile().tuning || {})[lens];
+  return tuned ? `${base}\n\nFor this profile: ${tuned}` : base;
+}
+function boundaryHits(t) { return M.forbidden_provenance.filter(p => new RegExp(p, "i").test(t || "")); }
+function certHits(t) { return M.forbidden_cert.filter(p => new RegExp(p, "i").test(t || "")); }
+
+function contextBlock() {
+  const r = S.request, L = [
+    `Profile: ${profile().label}`,
+    `Audience (who will rely on the page): ${r.audience}`,
+    `As-of date (freeze): ${r.as_of}`,
+  ];
+  if (r.subject) L.push(`Subject: ${r.subject}`);
+  if (r.purpose) L.push(`Purpose / mandate: ${r.purpose}`);
+  L.push(r.requisition ? `Requisition: ${r.requisition}` : "Requisition: none stated; adjudicate the document in general terms.");
+  for (const d of r.standing_disclosures) L.push(`Standing disclosure: ${d.relationship} (claims affected: ${d.claims_affected.join(", ") || "unspecified"})`);
+  for (const x of r.external_inputs) L.push(`External input on record: ${x}`);
+  L.push("Contemporary facts: no fact check was run at the freeze in this edition. Report any contemporary public fact that matters as unverified; never assert it true or false from memory. Leave fact_refs out.");
+  L.push("Tier anchors (these fix the tier of the defects they describe):");
+  for (const a of tierAnchors()) L.push(`  - ${a}`);
+  if (S.prior && S.prior.adjudications.length) {
+    L.push("Cycle 2: honour these recorded adjudications and review deltas only:");
+    for (const a of S.prior.adjudications) L.push(`  - ${a}`);
+  }
+  return L.join("\n");
+}
+function docBlock() { return `<context>\n${contextBlock()}\n</context>\n\n<frozen_document>\n${S.frozen_text}\n</frozen_document>`; }
+
+const FINDING_SHAPE = `{"tier": one of ${TIER_KEYS.map(t => `"${t}"`).join(" | ")},
+   "finding": "what is wrong, in one or two measured sentences",
+   "quote": "verbatim words from one document line (empty unless evidence_state is present)",
+   "evidence_state": "present" | "absent" | "unreadable",
+   "remedy_class": one of ${M.remedy_classes.map(t => `"${t}"`).join(" | ")},
+   "disposition": "what should happen to it",
+   "probe": "a precise question a person could ask, or empty"}`;
+
+function lensPrompt(lens) {
+  const L = M.lenses[lens];
+  let extra = "";
+  if (lens === "architecture" && S.proof_candidates.length) {
+    extra = "\n\n<proof_candidates>\nFlagged mechanically at freeze. Verify each against its line; report only genuine defects, and also proofread the rest of the text yourself.\n"
+      + S.proof_candidates.map(c => `  - ${c.at}: ${c.check}: '${c.match}'`).join("\n") + "\n</proof_candidates>";
+  }
+  return `${M.prompts.protocol}\n\n${docBlock()}\n\n<lens>\n${L.name} (${L.sanskrit})\nThe question it asks: ${L.question}\n\nCharter:\n${charterFor(lens)}\n</lens>${extra}\n\nRead the frozen document through this lens only.\n\nReply with only one JSON object, no other text, of this shape:\n{"reading": "a short paragraph",\n "findings": [ ${FINDING_SHAPE} ]}`;
+}
+function reconcilePrompt(all) {
+  const shape = `{"findings": [ {"source_ids": ["lens.n", ...], "lenses": [${LENS_KEYS.map(k => `"${k}"`).join(", ")} ...],
+   ${FINDING_SHAPE.slice(1, -1)} } ],
+ "log": [ {"source_ids": [...], "conflict": "...", "canon_rule": "I" | "II" | "III" | "IV" | "merge", "resolution": "..."} ],
+ "detachment_read": "...",
+ "reconciled_summary": "one paragraph",
+ "matters_reserved_to_owner": ["..."]}`;
+  const slim = all.map(f => ({ id: f.id, lens: f.lens, tier: f.tier, finding: f.finding, quote: f.quote,
+    evidence_state: f.evidence_state, remedy_class: f.remedy_class, disposition: f.disposition, probe: f.probe }));
+  return `${M.prompts.reconcile}\n\n${docBlock()}\n\n<lens_findings>\n${JSON.stringify(slim, null, 1)}\n</lens_findings>\n\nReply with only one JSON object, no other text, of this shape:\n${shape}`;
+}
+function rewritePrompt(accepted) {
+  return `${M.prompts.rewrite}\n\n${docBlock()}\n\n<accepted_findings>\n${JSON.stringify(accepted, null, 1)}\n</accepted_findings>\n\nReturn the revised document as plain text without the [D p L] addresses or freeze-record lines.\nReply with only one JSON object, no other text, of this shape:\n{"revised_text": "...", "changes": ["..."]}`;
+}
+
+/* One Claude call on the viewer's plan. Never retried from code. */
+async function ask(key, prompt, onChars) {
+  if (!SAMPLE) throw { code: "unavailable", message: "This view cannot call Claude." };
+  const bytes = enc.encode(prompt).length, cap = LIMITS?.maxPromptBytes || 262144;
+  if (bytes > cap) throw { code: "prompt_too_large", message: `The call would carry ${Math.round(bytes / 1024)} KiB; the limit is ${Math.round(cap / 1024)} KiB. Split the pack into smaller files and run each.` };
+  const ctl = new AbortController(); CTL[key] = ctl;
+  try {
+    const r = await SAMPLE(prompt, { modelTier: S.request.model_tier, signal: ctl.signal,
+      onText: ({ text }) => onChars && onChars(text.length) });
+    S.calls.push({ call: key, at: now(), tier_asked: S.request.model_tier, tier_applied: r.modelTierApplied, truncated: r.truncated, bytes_in: bytes });
+    const data = parseJSON(r.text);
+    if (!data) throw { code: "invalid_json", message: r.truncated ? "The answer was cut short." : "The answer was not JSON." };
+    return data;
+  } finally { delete CTL[key]; }
+}
+function errText(e) {
+  const c = e && e.code;
+  return ({
+    not_granted: "Claude access was not allowed for this page. Reload to be asked again.",
+    rate_limited: "Claude is busy for your account; retry in a minute.",
+    cancelled: "Stopped.",
+    refused: "Claude declined this call.",
+    prompt_too_large: e.message,
+    invalid_json: "The answer could not be read as JSON; retry.",
+    unavailable: "This view cannot call Claude.",
+  })[c] || (e && e.message) || "The call failed; retry.";
+}
+
+/* ------------------------------------------------------------ freeze */
+function linesFromText(text, page, out) {
+  for (const raw of text.split(/\r?\n/)) {
+    const t = raw.replace(/\s+$/, "");
+    if (t.trim()) out.push({ page, line: out.filter(l => l.page === page).length + 1, text: t });
+  }
+}
+function metaDate(v) { const m = /^D:(\d{4})(\d{2})(\d{2})/.exec(v || ""); return m ? `${m[1]}-${m[2]}-${m[3]}` : v; }
+
+async function pdfPages(buf) {
+  const doc = await pdfjsLib.getDocument({ data: buf, isEvalSupported: false }).promise;
+  const pages = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const tc = await page.getTextContent();
+    const lines = []; let cur = "", lastY = null, lastEnd = null;
+    for (const it of tc.items) {
+      if (!("str" in it)) continue;
+      const x = it.transform[4], y = it.transform[5];
+      if (lastY !== null && Math.abs(y - lastY) > 2 && cur) { lines.push(cur); cur = ""; lastEnd = null; }
+      if (lastEnd !== null && x - lastEnd > 1.5 && cur && !/\s$/.test(cur) && !/^\s/.test(it.str)) cur += " ";
+      cur += it.str; lastY = y; lastEnd = x + (it.width || 0);
+      if (it.hasEOL) { lines.push(cur); cur = ""; lastY = null; lastEnd = null; }
+    }
+    if (cur) lines.push(cur);
+    pages.push(lines.join("\n"));
+  }
+  let info = {};
+  try { info = (await doc.getMetadata()).info || {}; } catch {}
+  const meta = {};
+  for (const k of ["Title", "Author", "Creator", "Producer", "CreationDate", "ModDate"])
+    if (info[k]) meta[k.toLowerCase()] = /Date$/.test(k) ? metaDate(info[k]) : String(info[k]);
+  return { pages, meta, doc };
+}
+async function pdfPageImages(doc, maxPages) {
+  const blobs = [];
+  for (let p = 1; p <= Math.min(doc.numPages, maxPages); p++) {
+    const page = await doc.getPage(p), vp = page.getViewport({ scale: 2 });
+    const c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
+    await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+    blobs.push(await new Promise(r => c.toBlob(r, "image/jpeg", 0.88)));
+  }
+  return blobs;
+}
+async function transcribeImages(blobs, label) {
+  const per = Math.max(1, Math.min(LIMITS?.images?.maxCount || 1, 5)), pages = [];
+  for (let i = 0; i < blobs.length; i += per) {
+    const chunk = blobs.slice(i, i + per);
+    $("#freezeMsg").textContent = `Transcribing ${label}, pages ${i + 1}–${i + chunk.length} of ${blobs.length}…`;
+    const prompt = `The ${chunk.length} attached image(s) are pages ${i + 1} to ${i + chunk.length} of one document, in order. Transcribe each verbatim as rendered. Preserve line breaks, tables as pipe-separated rows, and handwriting as [handwritten: ...]. Mark any illegible or cropped character as [?]. Add nothing, correct nothing.\nReply with only a JSON object: {"pages": ["text of the first image", "..."]} with exactly ${chunk.length} strings.`;
+    const ctl = new AbortController(); CTL.transcribe = ctl;
+    const r = await SAMPLE(prompt, { images: chunk, modelTier: S.request.model_tier, signal: ctl.signal });
+    S.calls.push({ call: "transcribe", at: now(), tier_asked: S.request.model_tier, tier_applied: r.modelTierApplied, truncated: r.truncated, images: chunk.length });
+    const d = parseJSON(r.text);
+    if (!d || !Array.isArray(d.pages)) throw { code: "invalid_json", message: "Transcription was not readable." };
+    for (let k = 0; k < chunk.length; k++) pages.push(String(d.pages[k] ?? "[page not returned]"));
+  }
+  return pages;
+}
+function xml(s) { return new DOMParser().parseFromString(s, "application/xml"); }
+function walk(node, fn) { for (const c of node.children) if (fn(c) !== false) walk(c, fn); }
+function runText(el) {
+  let t = "";
+  walk(el, c => {
+    if (c.localName === "t") { t += c.textContent; return false; }
+    if (c.localName === "tab") t += "\t";
+    if (c.localName === "br" || c.localName === "cr") t += "\n";
+  });
+  return t;
+}
+async function officeMeta(zip) {
+  const f = zip.file("docProps/core.xml"); if (!f) return {};
+  const d = xml(await f.async("string")), meta = {};
+  for (const [tag, key] of [["title", "title"], ["creator", "author"], ["lastModifiedBy", "last modified by"], ["created", "created"], ["modified", "modified"]]) {
+    const el = d.getElementsByTagNameNS("*", tag)[0];
+    if (el && el.textContent.trim()) meta[key] = /ed$/.test(tag) && tag !== "lastModifiedBy" ? el.textContent.slice(0, 10) : el.textContent.trim();
+  }
+  return meta;
+}
+function tableRows(tbl) {
+  const rows = [];
+  for (const tr of tbl.getElementsByTagNameNS("*", "tr")) {
+    const cells = [...tr.children].filter(c => c.localName === "tc").map(tc => runText(tc).replace(/\s+/g, " ").trim());
+    if (cells.some(Boolean)) rows.push(cells.join(" | "));
+  }
+  return rows;
+}
+async function docxPages(buf) {
+  const zip = await JSZip.loadAsync(buf);
+  const d = xml(await zip.file("word/document.xml").async("string"));
+  const body = d.getElementsByTagNameNS("*", "body")[0], out = [];
+  for (const el of body.children) {
+    if (el.localName === "p") out.push(runText(el));
+    else if (el.localName === "tbl") out.push(...tableRows(el));
+    else if (el.localName === "sdt") out.push(runText(el));
+  }
+  return { pages: [out.join("\n")], meta: await officeMeta(zip), notes: ["Pages are not fixed in a .docx; the text is frozen as one page."] };
+}
+async function pptxPages(buf) {
+  const zip = await JSZip.loadAsync(buf);
+  const slides = Object.keys(zip.files).map(n => [n, /^ppt\/slides\/slide(\d+)\.xml$/.exec(n)]).filter(x => x[1])
+    .sort((a, b) => a[1][1] - b[1][1]).map(x => x[0]);
+  const pages = [];
+  for (const name of slides) {
+    const d = xml(await zip.file(name).async("string")), out = [];
+    walk(d.documentElement, c => {
+      if (c.localName === "tbl") { out.push(...tableRows(c)); return false; }
+      if (c.localName === "p" && c.namespaceURI && c.namespaceURI.includes("drawingml")) { out.push(runText(c)); return false; }
+    });
+    const rels = zip.file(name.replace("slides/", "slides/_rels/") + ".rels");
+    if (rels) {
+      const m = /Target="\.\.\/notesSlides\/(notesSlide\d+\.xml)"/.exec(await rels.async("string"));
+      const nf = m && zip.file("ppt/notesSlides/" + m[1]);
+      if (nf) {
+        const nd = xml(await nf.async("string")), notes = [];
+        walk(nd.documentElement, c => { if (c.localName === "p" && c.namespaceURI && c.namespaceURI.includes("drawingml")) { const t = runText(c).trim(); if (t && !/^\d+$/.test(t)) notes.push(t); return false; } });
+        if (notes.length) out.push("Speaker notes: " + notes[0], ...notes.slice(1));
+      }
+    }
+    pages.push(out.join("\n"));
+  }
+  return { pages, meta: await officeMeta(zip), notes: ["One page per slide; tables as ' | ' rows; speaker notes follow each slide."] };
+}
+
+const PROOF = [
+  [/(?<![@\w.])[A-Za-z]{2,}\.[a-z]{2,}\b(?![@.\w]*@)(?!\.(?:com|org|in|net|io)\b)/, "no space after a full stop"],
+  [/\w- \w/, "hyphen standing in for a dash, or a stray space after a hyphen"],
+  [/\w -\w/, "stray space before a hyphen"],
+  [/\w\s+[,;:](?!\S*\d)/, "space before punctuation"],
+  [/\b(\w{3,})\s+\1\b/i, "repeated word"],
+  [/\w\(|\)\w/, "missing space around a parenthesis"],
+];
+function proofCandidates(docs) {
+  const out = [];
+  for (const d of docs) for (const ln of d.lines) {
+    const text = ln.text.replace(/\S+@\S+/g, "");
+    for (const [rx, why] of PROOF) { const m = rx.exec(text); if (m) out.push({ at: `D${d.index} p${ln.page} L${ln.line}`, check: why, match: m[0] }); }
+  }
+  return out.slice(0, 30);
+}
+function renderForReading(docs) {
+  const parts = [];
+  for (const d of docs) {
+    parts.push(`=== DOCUMENT ${d.index}: ${d.filename} (${d.pages} pages) ===`);
+    const meta = Object.entries(d.metadata);
+    if (meta.length) parts.push("Freeze record, document metadata: " + meta.map(([k, v]) => `${k} ${v}`).join("; "));
+    for (const n of d.notes) parts.push(`Freeze record: ${n}`);
+    for (const ln of d.lines) parts.push(`[D${d.index} p${ln.page} L${ln.line}] ${ln.text}`);
+  }
+  return parts.join("\n");
+}
+function locate(quote) {
+  const q = norm(quote).replace(/^["' .]+|["' .]+$/g, "");
+  if (q.length < 3) return null;
+  for (const d of S.docs) for (const ln of d.lines) if (norm(ln.text).includes(q)) return `D${d.index} p${ln.page} L${ln.line}`;
+  for (const d of S.docs) {
+    const nl = d.lines.map(l => norm(l.text));
+    for (let i = 0; i < nl.length; i++) {
+      let w = nl[i];
+      for (let j = i + 1; j < Math.min(i + 6, nl.length); j++) { w += " " + nl[j]; if (w.includes(q)) return `D${d.index} p${d.lines[i].page} L${d.lines[i].line}`; }
+    }
+  }
+  return null;
+}
+
+function readRequest() {
+  const v = id => $(id).value.trim();
+  const prof = v("#f_profile");
+  const disc = v("#f_disclosure");
+  const r = {
+    profile: prof, subject: v("#f_subject"), audience: v("#f_audience") || M.profiles[prof].default_audience,
+    purpose: v("#f_purpose"), requisition: v("#f_requisition"), as_of: v("#f_as_of"),
+    owner: { name: v("#f_owner") }, releaser: { name: v("#f_releaser") },
+    standing_disclosures: disc ? [{ relationship: disc.split(";")[0].trim(), claims_affected: disc.split(";").slice(1).join(";").split(",").map(s => s.trim()).filter(Boolean) }] : [],
+    external_inputs: v("#f_external").split("\n").map(s => s.trim()).filter(Boolean),
+    distribution: v("#f_distribution"), route: v("#f_route"), contact: v("#f_contact"),
+    retention_days: Math.max(1, parseInt(v("#f_retention"), 10) || 90),
+    contains_personal_data: $("#f_personal").checked, purge_if_not_proceeding: $("#f_purge").checked,
+    model_tier: v("#f_tier"), cycle: 1, prior_run_id: null, allow_web_verification: false,
+  };
+  $("#r1").textContent = "";
+  if (!FILES.length) refuse("#r1", "Add at least one file.");
+  if (!r.owner.name) refuse("#r1", "Name the Owner: the person who decides every finding.");
+  if (!r.as_of) refuse("#r1", "Give the as-of date.");
+  if (r.releaser.name && r.releaser.name.toLowerCase() === r.owner.name.toLowerCase()) refuse("#r1", "REFUSED: Owner and Releaser must be different people.");
+  return r;
+}
+
+async function newRun(request, prior) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 13).replace("T", "-");
+  const rid = `WEB-${stamp}-${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
+  S = { run_id: rid, spec_version: M.spec_version, method_hash: await sha256(stable(M)), request, prior: prior || null,
+        docs: [], frozen_text: "", proof_candidates: [], status: "opened", lens_outputs: {}, lens_state: {},
+        calls: [], findings: [], reconciliation_log: [], decisions: {}, drafts: {}, events: [], opened_at: now() };
+  ev("run.opened", { run_id: rid, profile: request.profile, cycle: request.cycle, method_hash: S.method_hash });
+}
+
+async function freeze() {
+  let req;
+  try { req = readRequest(); } catch { return; }
+  $("#btnFreeze").disabled = true;
+  try {
+    await newRun(req);
+    let i = 0;
+    for (const f of FILES) {
+      i++;
+      $("#freezeMsg").textContent = `Freezing ${f.name}…`;
+      const buf = await f.arrayBuffer();
+      const d = { index: i, filename: f.name, bytes: buf.byteLength, sha256: await sha256(buf.slice(0)), metadata: {}, notes: [], lines: [], pages: 0, source: "" };
+      const ext = (f.name.split(".").pop() || "").toLowerCase();
+      let pages = [];
+      if (ext === "pdf") {
+        if (!window.pdfjsLib) throw { message: "The PDF reader did not load in this view." };
+        const r = await pdfPages(buf.slice(0));
+        pages = r.pages; d.metadata = r.meta; d.source = "pdf text layer (pdf.js)";
+        const chars = pages.join("").replace(/\s/g, "").length;
+        if (chars < 40 * pages.length) {
+          if (!SAMPLE || !LIMITS?.images) throw { message: `${f.name} has no usable text layer and this view cannot send page images to Claude. Use a PDF with selectable text.` };
+          pages = await transcribeImages(await pdfPageImages(r.doc, 20), f.name);
+          d.source = "page images transcribed by Claude at freeze";
+          d.notes.push("No text layer: pages were transcribed from page images by Claude at freeze; check figures against the original." + (r.doc.numPages > 20 ? ` Only the first 20 of ${r.doc.numPages} pages were transcribed.` : ""));
+        } else d.notes.push("Text taken from the PDF text layer in the browser; spacing may differ slightly from the rendered page and is not a defect.");
+      } else if (ext === "docx") { const r = await docxPages(buf); pages = r.pages; d.metadata = r.meta; d.notes.push(...r.notes); d.source = "docx XML"; }
+      else if (ext === "pptx") { const r = await pptxPages(buf); pages = r.pages; d.metadata = r.meta; d.notes.push(...r.notes); d.source = "pptx XML"; }
+      else if (["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
+        if (!SAMPLE || !LIMITS?.images) throw { message: `${f.name} is an image and this view cannot send images to Claude.` };
+        pages = await transcribeImages([f], f.name); d.source = "image transcribed by Claude at freeze";
+        d.notes.push("Transcribed from an image by Claude at freeze; check figures against the original.");
+      } else { pages = new TextDecoder().decode(buf).split("\f"); d.source = "plain text"; }
+      pages.forEach((t, k) => linesFromText(t, k + 1, d.lines));
+      d.pages = pages.length;
+      if (!d.lines.length) throw { message: `${f.name}: no text could be read.` };
+      S.docs.push(d);
+      ev("doc.frozen", { doc: i, filename: f.name, sha256: d.sha256, pages: d.pages, lines: d.lines.length });
+    }
+    S.frozen_text = renderForReading(S.docs);
+    S.proof_candidates = proofCandidates(S.docs);
+    S.frozen_at = now();
+    setStatus("frozen");
+    $("#freezeMsg").textContent = "Frozen.";
+    afterFreeze();
+  } catch (e) {
+    $("#r1").textContent = (e && e.code) ? errText(e) : (e && e.message) || String(e);
+    $("#freezeMsg").textContent = "";
+    S = null;
+  } finally { $("#btnFreeze").disabled = !FILES.length; }
+}
+
+function afterFreeze() {
+  for (const k of LENS_KEYS) S.lens_state[k] = { st: "waiting" };
+  enable("#s2", true); enable("#s3", true); enable("#s4", false); enable("#s5", false); enable("#s6", true);
+  renderFreeze(); renderLenses(); renderRegister(); renderRelease();
+  $("#btnRead").disabled = !SAMPLE; $("#btnStop").disabled = true;
+  ["#dlHtml", "#dlMd", "#dlJson", "#btnPurge"].forEach(b => $(b).disabled = false);
+  $("#s2").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function enable(sel, on) { $(sel).setAttribute("aria-disabled", on ? "false" : "true"); }
+
+function renderFreeze() {
+  const r = S.request, bytes = enc.encode(lensPrompt("architecture")).length;
+  const docs = S.docs.map(d => `<div><b>D${d.index}</b> ${esc(d.filename)} · ${d.pages} page(s) · ${d.lines.length} lines · ${esc(d.source)}<br><span class="mono">sha256 ${d.sha256}</span>${Object.keys(d.metadata).length ? `<br><span class="muted">metadata: ${esc(Object.entries(d.metadata).map(([k, v]) => `${k} ${v}`).join("; "))}</span>` : ""}</div>`).join("");
+  $("#freezeOut").className = "";
+  $("#freezeOut").innerHTML = `<dl class="kv">
+    <dt>Run</dt><dd class="mono">${esc(S.run_id)} · cycle ${r.cycle}${S.prior ? ` · prior ${esc(S.prior.run_id)}` : ""}</dd>
+    <dt>Edition · profile</dt><dd>${esc(profile().label)}</dd>
+    <dt>Specification</dt><dd class="mono">v${esc(S.spec_version)} · method ${S.method_hash.slice(0, 16)}…</dd>
+    <dt>Files</dt><dd style="display:grid;gap:6px">${docs}</dd>
+    <dt>Audience</dt><dd>${esc(r.audience)}</dd>
+    <dt>As of</dt><dd>${esc(r.as_of)}</dd>
+    <dt>Owner · Releaser</dt><dd>${esc(r.owner.name)} · ${esc(r.releaser.name || "not yet named")}</dd>
+    <dt>Fact check</dt><dd>Not run in this edition; contemporary public facts are reported as unverified.</dd>
+    <dt>Proof candidates</dt><dd>${S.proof_candidates.length} flagged for Architecture to verify</dd>
+    <dt>Call size</dt><dd>${Math.round(bytes / 1024)} KiB per lens call (limit ${Math.round((LIMITS?.maxPromptBytes || 262144) / 1024)} KiB)</dd>
+  </dl>
+  <details><summary>The frozen text every lens reads</summary><pre class="frozen">${esc(S.frozen_text)}</pre></details>`;
+  if (bytes > (LIMITS?.maxPromptBytes || 262144)) $("#r3").textContent = "This pack is too long for one call. Split it into smaller files and run each.";
+}
+
+/* ------------------------------------------------------------ audit */
+function gateCitations(lens, out) {
+  const kept = [], rejected = [];
+  (Array.isArray(out.findings) ? out.findings : []).slice(0, 12).forEach((raw, n) => {
+    const f = {
+      id: `${lens}.${n + 1}`, lens,
+      tier: String(raw.tier || "").toLowerCase(), finding: String(raw.finding || ""), quote: String(raw.quote || ""),
+      evidence_state: String(raw.evidence_state || "present").toLowerCase(), remedy_class: String(raw.remedy_class || "none"),
+      disposition: String(raw.disposition || ""), probe: String(raw.probe || ""),
+    };
+    if (!M.remedy_classes.includes(f.remedy_class)) f.remedy_class = "none";
+    if (!TIER_KEYS.includes(f.tier)) return rejected.push({ ...f, reason: `unknown tier '${raw.tier}'` });
+    if (!M.evidence_states.includes(f.evidence_state)) f.evidence_state = "present";
+    if (f.evidence_state === "present") {
+      const loc = locate(f.quote);
+      if (!loc) return rejected.push({ ...f, reason: "quotation not found in the frozen source" });
+      f.location = loc;
+    } else f.location = "-";
+    if (boundaryHits(f.finding + f.disposition).length) return rejected.push({ ...f, reason: "output boundary (I5)" });
+    kept.push(f);
+  });
+  return { reading: String(out.reading || ""), findings: kept, rejected };
+}
+
+let reading = false;
+async function runReading() {
+  if (reading) return;
+  reading = true; $("#r3").textContent = ""; $("#btnRead").disabled = true; $("#btnStop").disabled = false;
+  if (S.status === "frozen") setStatus("auditing");
+  const todo = LENS_KEYS.filter(k => S.lens_state[k].st !== "done");
+  let fatal = null;
+  const worker = async () => {
+    while (todo.length && !fatal) {
+      const lens = todo.shift();
+      S.lens_state[lens] = { st: "thinking" }; renderLenses();
+      try {
+        const out = await ask(lens, lensPrompt(lens), n => { S.lens_state[lens] = { st: "writing", chars: n }; renderLenses(); });
+        S.lens_outputs[lens] = gateCitations(lens, out);
+        const lo = S.lens_outputs[lens];
+        S.lens_state[lens] = { st: "done" };
+        ev("lens.completed", { lens, findings: lo.findings.length, rejected: lo.rejected.length });
+      } catch (e) {
+        S.lens_state[lens] = { st: e.code === "cancelled" ? "waiting" : "failed", err: errText(e) };
+        if (e.code !== "cancelled") ev("lens.failed", { lens, code: e.code || "error" });
+        if (["not_granted", "unavailable", "prompt_too_large", "cancelled"].includes(e.code)) fatal = e;
+      }
+      renderLenses();
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  reading = false; $("#btnStop").disabled = true;
+  const done = LENS_KEYS.filter(k => S.lens_state[k].st === "done").length;
+  if (fatal && fatal.code !== "cancelled") $("#r3").textContent = errText(fatal);
+  if (done < LENS_KEYS.length) {
+    $("#readMsg").textContent = `${done} of 7 lenses complete. ${fatal && fatal.code === "cancelled" ? "Stopped." : "Retry the failed lenses to continue."}`;
+    $("#btnRead").disabled = !SAMPLE; $("#btnRead").textContent = "Resume the reading";
+    return;
+  }
+  setStatus("audited");
+  await reconcile();
+}
+function stopAll() { Object.values(CTL).forEach(c => c.abort()); }
+
+function renderLenses() {
+  $("#lensGrid").innerHTML = LENS_KEYS.map(k => {
+    const L = M.lenses[k], s = (S && S.lens_state[k]) || { st: "waiting" }, lo = S && S.lens_outputs[k];
+    const cls = s.st === "done" ? "done" : s.st === "failed" ? "failed" : (s.st === "thinking" || s.st === "writing") ? "busy" : "";
+    const st = s.st === "done" ? `${lo.findings.length} finding(s)${lo.rejected.length ? `, ${lo.rejected.length} rejected` : ""}`
+      : s.st === "thinking" ? "thinking" : s.st === "writing" ? `writing · ${s.chars} chars` : s.st === "failed" ? esc(s.err) : "waiting";
+    return `<div class="lens ${cls}"><b>${esc(L.name)} <span class="muted mono" style="font-weight:400">${esc(L.sanskrit)}</span></b><span class="muted" style="font-size:.84rem">${esc(L.question)}</span><span class="st">${st}</span></div>`;
+  }).join("");
+}
+
+/* ------------------------------------------------------------ reconcile */
+function verdictOf(fs) {
+  const t = new Set(fs.map(f => f.tier));
+  return t.has("blocking") ? "blocking" : (t.has("material") || t.has("corrective")) ? "corrective" : "clean";
+}
+function verdictLine() {
+  if (!S.verdict) return "pending";
+  const top = S.findings.map(f => f.tier).sort((a, b) => M.tiers[b].rank - M.tiers[a].rank)[0];
+  const meaning = { blocking: "not releasable; a Blocking finding cannot be waived",
+    corrective: "not releasable as it stands; open findings need a decision or correction",
+    clean: "releasable on the two human signatures" }[S.verdict];
+  return `${S.verdict}: ${meaning}` + (top ? `; highest tier ${titleCase(top)}` : "");
+}
+async function reconcile() {
+  $("#readMsg").textContent = "Reconciling under the Precedence Canon…";
+  const all = LENS_KEYS.flatMap(k => S.lens_outputs[k].findings);
+  const byId = Object.fromEntries(all.map(f => [f.id, f]));
+  let out;
+  try {
+    out = all.length ? await ask("reconcile", reconcilePrompt(all), n => { $("#readMsg").textContent = `Reconciling… ${n} chars`; })
+      : { findings: [], log: [], detachment_read: "No findings to strip.", reconciled_summary: "No lens returned a finding that survived the citation gate.", matters_reserved_to_owner: [] };
+  } catch (e) {
+    $("#r3").textContent = "Reconciliation: " + errText(e);
+    $("#readMsg").textContent = "";
+    $("#btnRead").disabled = false; $("#btnRead").textContent = "Retry reconciliation";
+    return;
+  }
+  const counters = Object.fromEntries(TIER_KEYS.map(t => [t, 0])), accounted = new Set(), merged = [];
+  const rank = t => (M.tiers[t] || { rank: 0 }).rank;
+  for (let m of (out.findings || []).filter(x => TIER_KEYS.includes(String(x.tier).toLowerCase())).map(x => ({ ...x, tier: String(x.tier).toLowerCase() })).sort((a, b) => rank(b.tier) - rank(a.tier))) {
+    const srcs = (m.source_ids || []).filter(s => byId[s]);
+    if (!srcs.length) continue;   // reconciliation may not invent findings
+    let loc = "-";
+    if (m.evidence_state === "present") {
+      loc = locate(m.quote);
+      if (!loc) { const s = byId[srcs[0]]; m = { ...m, quote: s.quote, evidence_state: s.evidence_state }; loc = s.location; }
+    }
+    counters[m.tier]++; srcs.forEach(s => accounted.add(s));
+    merged.push({ id: `${M.tiers[m.tier].prefix}${counters[m.tier]}`, tier: m.tier, finding: String(m.finding || ""), quote: String(m.quote || ""),
+      evidence_state: m.evidence_state || "present", remedy_class: M.remedy_classes.includes(m.remedy_class) ? m.remedy_class : "none",
+      disposition: String(m.disposition || ""), probe: String(m.probe || ""), location: loc, source_ids: srcs,
+      lenses: [...new Set((m.lenses || []).filter(l => LENS_KEYS.includes(l)).concat(srcs.map(s => byId[s].lens)))] });
+  }
+  const log = (out.log || []).map(e => ({ source_ids: e.source_ids || [], conflict: String(e.conflict || ""), canon_rule: String(e.canon_rule || ""), resolution: String(e.resolution || "") }));
+  const logged = new Set(log.flatMap(e => e.source_ids));
+  for (const f of all) {
+    if (accounted.has(f.id) || logged.has(f.id)) continue;
+    counters[f.tier]++;
+    merged.push({ ...f, id: `${M.tiers[f.tier].prefix}${counters[f.tier]}`, lenses: [f.lens], source_ids: [f.id] });
+    log.push({ source_ids: [f.id], conflict: "Not accounted for by reconciliation.", canon_rule: "merge", resolution: "Carried forward unchanged." });
+  }
+  merged.sort((a, b) => rank(b.tier) - rank(a.tier) || a.id.localeCompare(b.id, undefined, { numeric: true }));
+  Object.assign(S, { findings: merged, reconciliation_log: log, detachment_read: String(out.detachment_read || ""),
+    reconciled_summary: String(out.reconciled_summary || ""), matters_reserved_to_owner: (out.matters_reserved_to_owner || []).map(String),
+    decisions: {}, verdict: verdictOf(merged) });
+  ev("run.reconciled", { findings: Object.fromEntries(Object.entries(counters).filter(([, c]) => c)), log_entries: log.length, verdict: S.verdict });
+  setStatus("awaiting_owner");
+  const tiers = new Set(S.calls.map(c => c.tier_applied));
+  S.model_identity = `Claude via the viewer's plan (artifact sample capability) · tier asked ${S.request.model_tier} · tier applied ${[...tiers].join(", ")}`;
+  $("#readMsg").textContent = "Reconciled.";
+  $("#btnRead").textContent = "Run the reading";
+  enable("#s4", true);
+  renderRegister(); renderRelease();
+  $("#s4").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function tally() { return TIER_KEYS.map(t => [t, S.findings.filter(f => f.tier === t).length]).filter(([, c]) => c); }
+function renderRegister() {
+  if (!S || !S.verdict) { $("#registerOut").className = "muted"; $("#registerOut").textContent = "The register appears after reconciliation."; $("#ownerBox").classList.add("hidden"); return; }
+  const open = S.status === "awaiting_owner";
+  const rows = S.findings.map(f => {
+    const d = S.decisions[f.id] || S.drafts[f.id] || { decision: "", note: "" };
+    const opts = Object.entries(DECISIONS).filter(([k]) => f.tier !== "blocking" || k === "accept" || k === "adjudicate")
+      .map(([k, l]) => `<option value="${k}" ${d.decision === k ? "selected" : ""}>${esc(l)}</option>`).join("");
+    const ctrl = open ? `<select data-f="${f.id}" data-k="decision"><option value="">Decide…</option>${opts}</select><input type="text" data-f="${f.id}" data-k="note" placeholder="Reasons" value="${esc(d.note)}" style="margin-top:6px">`
+      : S.decisions[f.id] ? `<b>${esc(S.decisions[f.id].decision.replace("_", " "))}</b>${S.decisions[f.id].note ? `<span class="q">${esc(S.decisions[f.id].note)}</span>` : ""}` : "";
+    return `<tr><td class="id ${f.tier}">${f.id}</td><td>${esc(f.lenses.map(l => M.lenses[l].name).join(", "))}</td>
+      <td>${esc(f.finding)}${f.quote ? `<span class="q">“${esc(f.quote)}”</span>` : `<span class="q">${esc(f.evidence_state)}: no result in the document supplied</span>`}${f.probe ? `<span class="q">Probe: ${esc(f.probe)}</span>` : ""}</td>
+      <td class="mono">${esc(f.location)}</td><td>${esc(f.disposition)}<span class="q">${esc(f.remedy_class.replace(/_/g, " "))}</span></td><td>${ctrl}</td></tr>`;
+  }).join("");
+  const rejected = LENS_KEYS.flatMap(k => (S.lens_outputs[k] || { rejected: [] }).rejected);
+  $("#registerOut").className = "";
+  $("#registerOut").innerHTML = `
+    <div class="verdict ${S.verdict}">${esc(verdictLine())}</div>
+    <div class="counts" style="margin-top:10px">${tally().map(([t, c]) => `<span>${c} ${titleCase(t)}</span>`).join("") || "<span>no findings</span>"}${rejected.length ? `<span>${rejected.length} citation(s) rejected</span>` : ""}</div>
+    <p style="margin-top:12px">${esc(S.reconciled_summary)}</p>
+    ${S.matters_reserved_to_owner.length ? `<h3 style="margin-top:12px">Matters reserved to the Owner</h3><ul>${S.matters_reserved_to_owner.map(m => `<li>${esc(m)}</li>`).join("")}</ul>` : ""}
+    <div class="wrap" style="margin-top:12px"><table><thead><tr><th>No.</th><th>Lens</th><th>Finding</th><th>Line</th><th>Disposition</th><th>Owner</th></tr></thead><tbody>${rows || `<tr><td colspan="6" class="muted">No findings.</td></tr>`}</tbody></table></div>
+    <details style="margin-top:10px"><summary>Detachment read, seven readings, reconciliation log${rejected.length ? ", rejected citations" : ""}</summary>
+      <h3 style="margin-top:10px">Detachment read</h3><p>${esc(S.detachment_read)}</p>
+      <h3 style="margin-top:10px">The seven readings</h3>${LENS_KEYS.map(k => `<p style="margin-top:6px"><b>${esc(M.lenses[k].name)}.</b> ${esc(S.lens_outputs[k].reading)}</p>`).join("")}
+      <h3 style="margin-top:10px">Reconciliation log</h3><div class="wrap"><table><thead><tr><th>Sources</th><th>Conflict</th><th>Rule</th><th>Resolution</th></tr></thead><tbody>${S.reconciliation_log.map(e => `<tr><td class="mono">${esc(e.source_ids.join(", "))}</td><td>${esc(e.conflict)}</td><td class="mono">${esc(e.canon_rule)}</td><td>${esc(e.resolution)}</td></tr>`).join("")}</tbody></table></div>
+      ${rejected.length ? `<h3 style="margin-top:10px">Rejected at the citation gate</h3><ul>${rejected.map(f => `<li><span class="mono">${esc(f.id)}</span> ${esc(f.reason)}: ${esc(f.finding)}</li>`).join("")}</ul>` : ""}
+    </details>`;
+  $("#ownerBox").classList.toggle("hidden", !open);
+  $("#registerOut").querySelectorAll("[data-f]").forEach(el => el.addEventListener("input", () => {
+    const d = S.drafts[el.dataset.f] || (S.drafts[el.dataset.f] = { decision: "", note: "" });
+    d[el.dataset.k] = el.value;
+  }));
+}
+
+/* ------------------------------------------------------------ gates */
+function decide() {
+  $("#r4").textContent = "";
+  try {
+    if (S.status !== "awaiting_owner") refuse("#r4", `No Owner decision is pending (state ${S.status}).`);
+    const name = $("#g_owner").value.trim();
+    if (name.toLowerCase() !== S.request.owner.name.toLowerCase()) refuse("#r4", "REFUSED: only the named Owner may decide.");
+    for (const f of S.findings) {
+      const d = S.drafts[f.id] || {};
+      if (!d.decision) refuse("#r4", `The Owner must decide every finding; ${f.id} is open.`);
+      if (f.tier === "blocking" && ["reject", "residual_risk"].includes(d.decision)) refuse("#r4", "REFUSED: a Blocking finding cannot be waived, by anyone, ever.");
+      if (["reject", "residual_risk", "adjudicate"].includes(d.decision) && !(d.note || "").trim()) refuse("#r4", `${f.id}: '${d.decision.replace("_", " ")}' requires reasons.`);
+    }
+    const at = now();
+    S.decisions = Object.fromEntries(S.findings.map(f => [f.id, { decision: S.drafts[f.id].decision, note: (S.drafts[f.id].note || "").trim(), by: name, at }]));
+    ev("owner.decided", { owner: name, decisions: Object.fromEntries(Object.entries(S.decisions).map(([k, v]) => [k, v.decision])) });
+    const blocking = S.findings.some(f => f.tier === "blocking");
+    const needsChange = S.findings.some(f => S.decisions[f.id].decision === "accept" && ["blocking", "material", "corrective"].includes(f.tier));
+    setStatus("owner_decided");
+    if (blocking || (needsChange && S.request.profile === "general")) {
+      if (S.request.cycle >= M.max_cycles) setStatus("closed_not_releasable");
+    } else setStatus("awaiting_release");
+    enable("#s5", true);
+    renderRegister(); renderRelease();
+    $("#s5").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch {}
+}
+
+function renderRelease() {
+  const ok = S && ["owner_decided", "awaiting_release", "closed_not_releasable", "released"].includes(S.status);
+  $("#rewriteBox").classList.toggle("hidden", !ok || !(S.status === "owner_decided" || (S.status === "awaiting_release" && S.findings.some(f => S.decisions[f.id]?.decision === "accept"))));
+  $("#signBox").classList.toggle("hidden", !(S && S.status === "awaiting_release"));
+  if (!S || !ok) { $("#releaseOut").className = "muted"; $("#releaseOut").textContent = "Follows the Owner decision."; return; }
+  const msg = {
+    owner_decided: `This version cannot be released as it stands: the accepted remedies must be applied and the revised version read again (cycle ${S.request.cycle + 1} of ${M.max_cycles}).`,
+    closed_not_releasable: `Closed: not releasable. The two-cycle cap is reached with a remedy still required.`,
+    awaiting_release: "The Owner has decided every finding. The named Releaser, a different person, may now sign. The integrated rewrite is optional at this point.",
+    released: `Released ${S.certificate?.releaser.at} by ${S.certificate?.releaser.name}.`,
+  }[S.status];
+  $("#releaseOut").className = "";
+  $("#releaseOut").innerHTML = `<p class="${S.status === "released" ? "" : "note"}">${esc(msg)}</p>` + (S.certificate ? `<dl class="kv" style="margin-top:10px"><dt>Certificate</dt><dd>${esc(S.certificate.text)}</dd><dt>Record hash</dt><dd class="mono">${S.certificate.register_head}</dd></dl>` : "");
+  $("#btnCycle2").classList.toggle("hidden", !(S.proposed_rewrite && S.status === "owner_decided" && S.request.cycle < M.max_cycles));
+  $("#btnRewriteDl").classList.toggle("hidden", !(S.proposed_rewrite && DL));
+}
+
+async function rewrite() {
+  const accepted = S.findings.filter(f => S.decisions[f.id]?.decision === "accept")
+    .map(f => ({ id: f.id, tier: f.tier, finding: f.finding, quote: f.quote, location: f.location, disposition: f.disposition, remedy_class: f.remedy_class, owner_note: S.decisions[f.id].note }));
+  $("#btnRewrite").disabled = true; $("#rewriteMsg").textContent = "Thinking…";
+  try {
+    const out = await ask("rewrite", rewritePrompt(accepted), n => { $("#rewriteMsg").textContent = `Writing… ${n} chars`; });
+    const text = String(out.revised_text || ""), changes = (out.changes || []).map(String);
+    if (!text.trim()) throw { message: "The rewrite came back empty; retry." };
+    if (boundaryHits(text + changes.join(" ")).length) throw { message: "The rewrite crossed the output boundary (I5) and was discarded; retry." };
+    S.proposed_rewrite = { revised_text: text, changes, at: now() };
+    ev("rewrite.proposed", { changes: changes.length, sha256: await sha256(text) });
+    $("#rewriteMsg").textContent = `${changes.length} change(s) proposed. Nothing is applied without the Owner.`;
+    $("#rewriteOut").innerHTML = `<h3>Changes</h3><ul>${changes.map(c => `<li>${esc(c)}</li>`).join("")}</ul><details><summary>Revised text</summary><pre class="frozen">${esc(text)}</pre></details>`;
+  } catch (e) { $("#rewriteMsg").textContent = errText(e); }
+  $("#btnRewrite").disabled = false;
+  renderRelease();
+}
+
+async function cycle2() {
+  const prev = S;
+  const req = { ...prev.request, cycle: prev.request.cycle + 1, prior_run_id: prev.run_id };
+  const prior = { run_id: prev.run_id, verdict: prev.verdict, record_md: recordMarkdown(prev),
+    adjudications: prev.findings.map(f => `${f.id} (${f.tier}): ${prev.decisions[f.id].decision.replace("_", " ")}${prev.decisions[f.id].note ? `: ${prev.decisions[f.id].note}` : ""} | ${f.finding}`) };
+  await newRun(req, prior);
+  const text = prev.proposed_rewrite.revised_text, name = `revised text (cycle ${req.cycle} of ${prev.run_id})`;
+  const d = { index: 1, filename: name, bytes: enc.encode(text).length, sha256: await sha256(text), metadata: {}, notes: [`Integrated rewrite proposed at the end of cycle ${prev.request.cycle}, run ${prev.run_id}.`], lines: [], pages: 0, source: "integrated rewrite" };
+  text.split("\f").forEach((t, k) => linesFromText(t, k + 1, d.lines)); d.pages = Math.max(1, text.split("\f").length);
+  S.docs.push(d);
+  ev("doc.frozen", { doc: 1, filename: name, sha256: d.sha256, pages: d.pages, lines: d.lines.length });
+  S.frozen_text = renderForReading(S.docs); S.proof_candidates = proofCandidates(S.docs); S.frozen_at = now();
+  setStatus("frozen");
+  $("#rewriteOut").innerHTML = ""; $("#rewriteMsg").textContent = "";
+  afterFreeze();
+}
+
+async function sign() {
+  $("#r5").textContent = "";
+  try {
+    if (S.status !== "awaiting_release") refuse("#r5", "REFUSED: any release without both human moments.");
+    if (S.findings.some(f => f.tier === "blocking")) refuse("#r5", "REFUSED: a Blocking finding stands.");
+    const name = $("#g_releaser").value.trim(), meaning = $("#g_meaning").value.trim() || "Authorised for release";
+    const named = S.request.releaser.name;
+    if (!named) refuse("#r5", "REFUSED: no Releaser was named at the freeze. Start a new run that names one.");
+    if (name.toLowerCase() !== named.toLowerCase()) refuse("#r5", "REFUSED: only the named Releaser may sign.");
+    if (name.toLowerCase() === S.request.owner.name.toLowerCase()) refuse("#r5", "REFUSED: Owner and Releaser must be different people.");
+    if (certHits(meaning).length) refuse("#r5", "REFUSED: the signature may state alignment, never compliance or certification.");
+    const text = `Standards passed: all seven lenses executed on the frozen version. Verdict ${S.verdict}. Aligned with, not certified under, any regime.`;
+    await ev("release.signed", { releaser: name, meaning, verdict: S.verdict });
+    await evChain;
+    S.certificate = { run_id: S.run_id, spec_version: S.spec_version, method_hash: S.method_hash,
+      files: S.docs.map(d => ({ name: d.filename, sha256: d.sha256 })), verdict: S.verdict, text,
+      owner: { name: S.request.owner.name, at: Object.values(S.decisions)[0]?.at },
+      releaser: { name, at: now(), meaning }, retention_days: S.request.retention_days,
+      register_head: S.events[S.events.length - 1].hash };
+    setStatus("released");
+    renderRelease();
+  } catch (e) { if (!(e instanceof Error && e.message === "refused")) $("#r5").textContent = String(e.message || e); }
+}
+
+/* ------------------------------------------------------------ the record */
+function releaseLine(R) {
+  const req = R.request, h = { ...M.default_handling, ...(M.profiles[req.profile].handling || {}) };
+  return {
+    "Compiled by": `${R.model_identity || "Claude via the viewer's plan"}, for the Owner`,
+    "Owner · Releaser": `${req.owner.name} · ${req.releaser.name || "not yet named"}`,
+    "Contact": req.contact || `${req.owner.name} (Owner); no other contact supplied`,
+    "Distribution": req.distribution || h.distribution,
+    "Route": req.route || h.route,
+    "Personal data": req.contains_personal_data ? "Contains personal data; anonymise before any circulation beyond the distribution above" : "None declared",
+    "Retention": `${req.retention_days} days` + (req.purge_if_not_proceeding ? "; purged if the file does not proceed" : ""),
+    "Status": R.certificate ? `Released ${R.certificate.releaser.at} by ${R.certificate.releaser.name}` : "Not released: this record may not travel beyond the Owner until signed",
+    ...(h.note ? { "Note": h.note } : {}),
+  };
+}
+function recordBlocks(R) {
+  const req = R.request, prof = M.profiles[req.profile], B = [];
+  const subj = req.subject || R.docs.map(d => d.filename).join(", ");
+  const SV = S; S = R; const vline = verdictLine(); S = SV;
+  B.push({ p: "Private and Confidential", em: true }, { h1: "SaptaDrishti Run Record" },
+    { p: `Run ${R.run_id} · ${prof.label} · Specification v${R.spec_version} · Cycle ${req.cycle}`, strong: true }, { p: `Subject: ${subj}` });
+  if (req.contains_personal_data) B.push({ p: "Internal record: contains personal data; anonymise before any circulation.", em: true });
+  B.push({ h2: "A. Purpose and boundary" }, { ol: [
+    `This record sets out Run ${R.run_id}, conducted under the ${prof.label}, Specification v${R.spec_version}, at Cycle ${req.cycle}. The seven lenses were applied to the frozen pack, each in isolation, reconciled under the Precedence Canon, and the findings tiered below.`,
+    "This record certifies document integrity and decision-sufficiency of the record as frozen. It is not a decision, an endorsement, or an assessment of any person; adjudications reserved to the Owner remain open until taken.",
+    "Browser edition: the reading ran on the viewer's own Claude plan through the artifact sample capability. No web fact check was run; contemporary public facts are reported as unverified.",
+    ...(prof.disclaimer ? [prof.disclaimer] : []),
+  ] });
+  const tiers = [...new Set(R.calls.map(c => c.tier_applied))].join(", ") || "none yet";
+  B.push({ h2: "B. Freeze record" }, { table: { head: ["Field", "Entry"], rows: [
+    ["Run ID", R.run_id], ["Edition · Profile", prof.label], ["Specification · method hash", `v${R.spec_version} · ${R.method_hash}`],
+    ["Engine", `Claude via the viewer's plan · tier asked ${req.model_tier} · tier applied ${tiers} · ${R.calls.length} call(s)`],
+    ...R.docs.map(d => [`File D${d.index}`, `${d.filename} · ${d.pages} page(s) · ${d.lines.length} lines · ${d.source} · sha256 ${d.sha256}`]),
+    ...R.docs.filter(d => Object.keys(d.metadata).length).map(d => [`Metadata D${d.index}`, Object.entries(d.metadata).map(([k, v]) => `${k} ${v}`).join("; ")]),
+    ...R.docs.flatMap(d => d.notes.map(n => [`Note D${d.index}`, n])),
+    ["Frozen at · as of", `${R.frozen_at || "-"} · ${req.as_of}`], ["Audience", req.audience], ["Purpose", req.purpose || "-"],
+    ["Requisition", req.requisition || "none stated"], ["Owner · Releaser", `${req.owner.name} · ${req.releaser.name || "not yet named"}`],
+    ["Contemporary facts", "Not verified at freeze in this edition"],
+    ...(R.prior ? [["Prior run", `${R.prior.run_id} (verdict ${R.prior.verdict})`]] : []),
+  ] } });
+  if (req.standing_disclosures.length || (R.prior && R.prior.adjudications.length)) {
+    B.push({ h2: "C. Standing disclosure" });
+    req.standing_disclosures.forEach(d => B.push({ p: `${d.relationship}. Claims affected: ${d.claims_affected.join(", ") || "unspecified"}. Neither discount nor premium attaches to acquaintance.` }));
+    if (R.prior) B.push({ h3: "Adjudications honoured from the prior cycle" }, { ul: R.prior.adjudications });
+  }
+  B.push({ h2: "D. Findings" });
+  if (R.findings.length) {
+    B.push({ table: { head: ["No.", "Tier", "Lens", "Finding", "Line", "Disposition", "Owner"], rows: R.findings.map(f => [
+      f.id, titleCase(f.tier), f.lenses.map(l => M.lenses[l].name).join(", "),
+      f.finding + (f.quote ? ` — “${f.quote}”` : ` — ${f.evidence_state}: no result in the document supplied`),
+      f.location, `${f.disposition} (${f.remedy_class.replace(/_/g, " ")})`,
+      R.decisions[f.id] ? R.decisions[f.id].decision.replace("_", " ") + (R.decisions[f.id].note ? `: ${R.decisions[f.id].note}` : "") : "open"]) } });
+    const probes = R.findings.filter(f => f.probe);
+    if (probes.length) B.push({ h3: "Probes" }, { ul: probes.map(f => `${f.id}: ${f.probe}`) });
+  } else B.push({ p: R.verdict ? "No findings survived the citation gate." : "The reading has not completed." });
+  const readings = LENS_KEYS.filter(k => R.lens_outputs[k]);
+  if (readings.length) B.push({ h3: "The seven readings" }, { ul: readings.map(k => `${M.lenses[k].name}: ${R.lens_outputs[k].reading}`) });
+  const rej = LENS_KEYS.flatMap(k => (R.lens_outputs[k] || { rejected: [] }).rejected);
+  if (rej.length) B.push({ h3: "Rejected at the citation gate" }, { ul: rej.map(f => `${f.id} (${f.reason}): ${f.finding}`) });
+  if (R.verdict) {
+    B.push({ h2: "E. Detachment read" }, { p: R.detachment_read || "-" }, { p: R.reconciled_summary || "" });
+    if (R.reconciliation_log.length) B.push({ h3: "Reconciliation log" }, { table: { head: ["Sources", "Conflict", "Canon rule", "Resolution"], rows: R.reconciliation_log.map(e => [e.source_ids.join(", "), e.conflict, e.canon_rule, e.resolution]) } });
+    const t = TIER_KEYS.map(k => [k, R.findings.filter(f => f.tier === k).length]).filter(([, c]) => c).map(([k, c]) => `${c} ${titleCase(k)}`).join(", ") || "no findings";
+    B.push({ h2: "F. Verdict and matters reserved to the Owner" }, { p: `Cycle ${req.cycle} verdict: ${vline} (${t}).`, strong: true }, { p: M.verdict_rule });
+    if (R.matters_reserved_to_owner.length) B.push({ ul: R.matters_reserved_to_owner });
+    if (R.proposed_rewrite) B.push({ h3: "Integrated rewrite proposed" }, { ul: R.proposed_rewrite.changes });
+  }
+  B.push({ h2: "G. Release, handling and retention" }, { table: { head: ["Field", "Entry"], rows: Object.entries(releaseLine(R)) } });
+  if (R.certificate) B.push({ h3: "Release Certificate" }, { p: `${R.certificate.text} Owner: ${R.certificate.owner.name}. Releaser: ${R.certificate.releaser.name}, ${R.certificate.releaser.meaning} (${R.certificate.releaser.at}). Register head ${R.certificate.register_head}.` });
+  B.push({ h2: "H. Register" }, { p: "Append-only; each event's hash covers the previous event's hash. Recompute to check." },
+    { table: { head: ["#", "At", "Event", "Data", "Hash"], rows: R.events.map(e => [String(e.seq), e.at, e.kind, JSON.stringify(e.data), e.hash.slice(0, 16) + "…"]) } });
+  return B;
+}
+function recordMarkdown(R) {
+  const cell = s => String(s).replace(/\|/g, "\\|").replace(/\n/g, " ");
+  return recordBlocks(R).map(b => b.h1 ? `# ${b.h1}` : b.h2 ? `## ${b.h2}` : b.h3 ? `### ${b.h3}` :
+    b.p !== undefined ? (b.strong ? `**${b.p}**` : b.em ? `*${b.p}*` : b.p) :
+    b.ul ? b.ul.map(x => `- ${x}`).join("\n") : b.ol ? b.ol.map((x, i) => `${i + 1}. ${x}`).join("\n") :
+    b.table ? [`| ${b.table.head.join(" | ")} |`, `|${b.table.head.map(() => "---").join("|")}|`, ...b.table.rows.map(r => `| ${r.map(cell).join(" | ")} |`)].join("\n") : "").join("\n\n") + "\n";
+}
+function recordHtml(R) {
+  const body = recordBlocks(R).map(b => b.h1 ? `<h1>${esc(b.h1)}</h1>` : b.h2 ? `<h2>${esc(b.h2)}</h2>` : b.h3 ? `<h3>${esc(b.h3)}</h3>` :
+    b.p !== undefined ? `<p>${b.strong ? `<b>${esc(b.p)}</b>` : b.em ? `<i>${esc(b.p)}</i>` : esc(b.p)}</p>` :
+    b.ul ? `<ul>${b.ul.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : b.ol ? `<ol>${b.ol.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` :
+    b.table ? `<div class="w"><table><thead><tr>${b.table.head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${b.table.rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>` : "").join("\n");
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Run record ${esc(R.run_id)}</title>
+<style>:root{--bg:#fff;--ink:#151a22;--muted:#5b6474;--line:#dde1e8}@media (prefers-color-scheme:dark){:root{--bg:#10141b;--ink:#e7ebf1;--muted:#9aa3b2;--line:#2a313d;color-scheme:dark}}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;max-width:980px;margin:0 auto;padding:24px 16px}
+h1{font-size:1.7rem}h2{font-size:1.2rem;margin-top:28px;border-bottom:1px solid var(--line);padding-bottom:4px}h3{font-size:1rem;margin-top:18px}
+.w{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.86rem}th,td{text-align:left;vertical-align:top;padding:6px 8px;border:1px solid var(--line);overflow-wrap:anywhere}th{color:var(--muted)}
+@media print{body{max-width:none}}</style></head><body>${body}</body></html>`;
+}
+async function download(kind) {
+  if (!DL) return;
+  const base = `SD-${S.run_id}`;
+  const files = {
+    html: [`${base}-record.html`, () => recordHtml(S)],
+    md: [`${base}-record.md`, () => recordMarkdown(S)],
+    json: [`${base}-state.json`, () => { const { drafts, lens_state, ...rest } = S; return JSON.stringify(rest, null, 1); }],
+    rewrite: [`${base}-revised.txt`, () => S.proposed_rewrite.revised_text],
+  }[kind];
+  $("#dlMsg").textContent = "";
+  try { await DL.save({ filename: files[0], data: files[1]() }); $("#dlMsg").textContent = `Saved ${files[0]}.`; }
+  catch (e) { $("#dlMsg").textContent = e && e.code === "declined" ? "Download declined." : e && e.code === "rate_limited" ? "A save prompt is already open." : "Download is unavailable in this view."; }
+}
+
+function purge() {
+  stopAll(); S = null; FILES = []; CTL = {};
+  renderFiles(); renderLenses();
+  ["#freezeOut", "#registerOut", "#releaseOut"].forEach(s => { $(s).className = "muted"; });
+  $("#freezeOut").textContent = "Purged. Nothing frozen."; $("#registerOut").textContent = "The register appears after reconciliation."; $("#releaseOut").textContent = "Follows the Owner decision.";
+  $("#rewriteOut").innerHTML = ""; $("#rewriteMsg").textContent = ""; $("#readMsg").textContent = ""; $("#freezeMsg").textContent = ""; $("#dlMsg").textContent = "";
+  ["#r1", "#r3", "#r4", "#r5"].forEach(s => $(s).textContent = "");
+  ["#ownerBox", "#rewriteBox", "#signBox"].forEach(s => $(s).classList.add("hidden"));
+  ["#s2", "#s3", "#s4", "#s5", "#s6"].forEach(s => enable(s, false));
+  ["#btnRead", "#btnStop", "#dlHtml", "#dlMd", "#dlJson", "#btnPurge"].forEach(b => $(b).disabled = true);
+  $("#btnRead").textContent = "Run the reading";
+  $("#fileIn").value = "";
+}
+
+/* ------------------------------------------------------------ wiring */
+function renderFiles() {
+  $("#fileList").innerHTML = FILES.map((f, i) => `<li><span>D${i + 1} · ${esc(f.name)} <span class="muted">${Math.max(1, Math.round(f.size / 1024))} KB</span></span><button data-rm="${i}">Remove</button></li>`).join("");
+  $("#fileList").querySelectorAll("[data-rm]").forEach(b => b.addEventListener("click", () => { FILES.splice(+b.dataset.rm, 1); renderFiles(); }));
+  $("#btnFreeze").disabled = !FILES.length;
+}
+function addFiles(list) {
+  const ok = /\.(pdf|docx|pptx|txt|md)$/i, img = /\.(png|jpe?g|webp|gif)$/i;
+  for (const f of list) {
+    if (ok.test(f.name) || (img.test(f.name) && LIMITS?.images)) FILES.push(f);
+    else $("#r1").textContent = `${f.name}: this file type is not read here.`;
+  }
+  renderFiles();
+}
+function profileDefaults() {
+  const p = M.profiles[$("#f_profile").value];
+  $("#f_audience").placeholder = p.default_audience;
+  const h = { ...M.default_handling, ...(p.handling || {}) };
+  $("#f_distribution").placeholder = h.distribution; $("#f_route").placeholder = h.route;
+}
+
+$("#f_profile").innerHTML = Object.entries(M.profiles).map(([k, p]) => `<option value="${k}">${esc(p.label)}</option>`).join("");
+$("#f_as_of").value = new Date().toISOString().slice(0, 10);
+$("#f_profile").addEventListener("change", profileDefaults); profileDefaults();
+const drop = $("#drop");
+drop.addEventListener("click", () => $("#fileIn").click());
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("#fileIn").click(); } });
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); addFiles(e.dataTransfer.files); });
+$("#fileIn").addEventListener("change", e => addFiles(e.target.files));
+$("#btnFreeze").addEventListener("click", freeze);
+$("#btnRead").addEventListener("click", () => S && (S.status === "audited" ? reconcile() : runReading()));
+$("#btnStop").addEventListener("click", stopAll);
+$("#btnDecide").addEventListener("click", decide);
+$("#btnRewrite").addEventListener("click", rewrite);
+$("#btnRewriteDl").addEventListener("click", () => download("rewrite"));
+$("#btnCycle2").addEventListener("click", cycle2);
+$("#btnSign").addEventListener("click", sign);
+$("#dlHtml").addEventListener("click", () => download("html"));
+$("#dlMd").addEventListener("click", () => download("md"));
+$("#dlJson").addEventListener("click", () => download("json"));
+$("#btnPurge").addEventListener("click", purge);
+renderLenses();
+
+(async () => {
+  const c = window.claude;
+  if (!c || !c.use) { $("#unavailable").classList.remove("hidden"); $("#dlRow").classList.add("hidden"); return; }
+  const [s, d] = await Promise.all([c.use("sample").catch(() => null), c.use("downloads").catch(() => null)]);
+  SAMPLE = s; DL = d;
+  if (!SAMPLE) $("#unavailable").classList.remove("hidden");
+  else {
+    LIMITS = await SAMPLE.limits().catch(() => null);
+    if (LIMITS?.images) {
+      $("#fileIn").accept += "," + LIMITS.images.mediaTypes.join(",");
+      $("#acceptNote").textContent = "PDF (text or scanned), DOCX, PPTX, TXT, MD or page photos. Several files are read as one pack.";
+    }
+    if (S && S.status === "frozen") $("#btnRead").disabled = false;
+  }
+  if (!DL) $("#dlRow").innerHTML = `<span class="muted">Downloads are not available in this view.</span>`;
+})();
+</script>

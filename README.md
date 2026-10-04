@@ -76,6 +76,22 @@ frozen text sits in a cached prefix shared by all seven calls, so the document
 is billed at full price once and read seven times. Scanned PDFs are transcribed
 once at freeze, and that transcript is what gets frozen and cited.
 
+## Browser edition (no API key)
+
+`web/ingest.html` is an ingestion window that runs the same protocol in the
+browser, published as a claude.ai artifact. It uses the viewer's own Claude
+plan through the artifact `sample` capability, so it needs no API key. The page
+freezes files in the browser (SHA-256; PDF via pdf.js, DOCX and PPTX via JSZip,
+and scans or photos transcribed by Claude where images are allowed). It then
+makes seven isolated lens calls and one reconciliation call, applies the
+citation gate and the Owner and Releaser gates, and offers the run record as
+HTML, Markdown or JSON. It makes no web fact check, and nothing is stored
+outside the tab. The method data is injected from the Python package:
+
+```
+python web/build_ingest.py   # web/ingest.template.html -> web/ingest.html
+```
+
 ## Tests
 
 ```bash
